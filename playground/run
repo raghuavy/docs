@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Compile and run SystemVerilog in one step.
+#
+#   ./run file.sv              build with Verilator and run
+#   ./run file.sv other.sv     several files, the top module must be called tb
+#   ./run -D BUG file.sv       pass a define (same as `define BUG)
+#   ./run --wave file.sv       also write wave.vcd, open it in VS Code to see waveforms
+#   ./run --icarus file.sv     use Icarus Verilog instead of Verilator
+#   ./run --vcs file.sv        use Synopsys VCS, for example on the department servers
+#   ./run --vcs --uvm file.sv  VCS with the UVM 1.2 library
+set -euo pipefail
+
+usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; }
+
+sim=verilator; wave=0; uvm=0; defs=(); files=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --icarus) sim=icarus ;;
+    --vcs) sim=vcs ;;
+    --uvm) uvm=1 ;;
+    --wave) wave=1 ;;
+    -D) defs+=("$2"); shift ;;
+    -D*) defs+=("${1#-D}") ;;
+    -h|--help) usage; exit 0 ;;
+    *) files+=("$1") ;;
+  esac
+  shift
+done
+[ ${#files[@]} -gt 0 ] || { usage; exit 1; }
+[ $wave = 1 ] && defs+=("WAVE")
+
+build=$(mktemp -d)
+trap 'rm -rf "$build"' EXIT
+dflags=(); for d in "${defs[@]+"${defs[@]}"}"; do dflags+=("-D$d"); done
+
+if [ "$sim" = vcs ]; then
+  cflags=(-full64 -sverilog -timescale=1ns/1ps -top tb -o "$build/simv" -Mdir="$build/csrc")
+  [ $uvm = 1 ] && cflags+=(-ntb_opts uvm-1.2)
+  for d in "${defs[@]+"${defs[@]}"}"; do cflags+=("+define+$d"); done
+  echo "building with VCS..."
+  abs=(); for f in "${files[@]}"; do abs+=("$(realpath "$f")"); done
+  ( cd "$build" && vcs "${cflags[@]}" "${abs[@]}" > compile.log 2>&1 ) \
+    || { cat "$build/compile.log"; exit 1; }
+  echo "running..."
+  "$build/simv" || true
+elif [ "$sim" = icarus ]; then
+  iverilog -g2012 "${dflags[@]+"${dflags[@]}"}" -s tb -o "$build/sim" "${files[@]}"
+  vvp -n "$build/sim"
+else
+  vflags=(--binary --timing --assert -j 0 --top-module tb -Mdir "$build"
+          -Wno-fatal -Wno-lint -Wno-style)
+  [ $wave = 1 ] && vflags+=(--trace)
+  echo "building with Verilator..."
+  verilator "${vflags[@]}" "${dflags[@]+"${dflags[@]}"}" "${files[@]}" > "$build/build.log" 2>&1 \
+    || { cat "$build/build.log"; exit 1; }
+  grep -E "%(Warning|Error)" "$build/build.log" | grep -v -E "EOFNEWLINE|DECLFILENAME" || true
+  echo "running..."
+  "$build/Vtb" +verilator+error+limit+50 || true
+fi
+[ $wave = 1 ] && [ -f wave.vcd ] && echo "waveform written to wave.vcd"
+exit 0
