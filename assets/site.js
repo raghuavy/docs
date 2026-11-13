@@ -294,6 +294,26 @@
   }
   document.querySelectorAll("textarea[data-indent]").forEach(attachEditor);
 
+  // ---------- Copy buttons on code ----------
+  document.querySelectorAll("details.code, .tryit, .cmd, main > pre").forEach(function (box) {
+    var pre = box.tagName === "PRE" ? box : box.querySelector("pre");
+    if (!pre || pre.nextElementSibling && pre.nextElementSibling.classList.contains("copy-btn")) return;
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "btn copy-btn"; b.textContent = "Copy";
+    b.addEventListener("click", function () {
+      var text = pre.innerText.replace(/\n$/, "");
+      var done = function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500); };
+      var fallback = function () {
+        var r = document.createRange(); r.selectNodeContents(pre);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        b.textContent = "Selected, press Ctrl+C";
+      };
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fallback);
+      else fallback();
+    });
+    pre.insertAdjacentElement("afterend", b);
+  });
+
   // ---------- Problems ----------
   function loadSolved() { try { return JSON.parse(store.get("ee8350-solved") || "{}") || {}; } catch (e) { return {}; } }
   function saveSolved(o) { store.set("ee8350-solved", JSON.stringify(o)); }

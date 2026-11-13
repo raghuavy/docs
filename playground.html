@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playground | EE 8350 Guide</title>
+<script>(function(){var d=document.documentElement;try{var s=localStorage.getItem("ee8350-size");if(s)d.setAttribute("data-size",s);var t=localStorage.getItem("ee8350-theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t);var sp=localStorage.getItem("ee8350-split");if(sp===null)sp=window.innerWidth>=1000?"on":"off";if(sp==="on"&&window.innerWidth>=1000)d.classList.add("split");var w=localStorage.getItem("ee8350-splitw");if(w)d.style.setProperty("--split-w",w+"%");}catch(e){}if(window.self!==window.top){d.classList.add("embedded");d.classList.remove("split");}})();</script>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <nav class="sitenav" aria-label="Site"><a class="home" href="index.html">EE 8350 Guide</a><a class="navlink" href="playground.html">Playground</a></nav>
+  <div class="controls">
+    <div class="ctl sizer" role="group" aria-label="Text size">
+      <span class="ctl-label">Text</span>
+      <button type="button" data-size="1" aria-label="Smaller text">A</button>
+      <button type="button" data-size="2" aria-label="Normal text">A</button>
+      <button type="button" data-size="3" aria-label="Larger text">A</button>
+    </div>
+    <div class="ctl themer" role="group" aria-label="Color theme">
+      <span class="ctl-label">Theme</span>
+      <button type="button" data-theme-set="light">Light</button>
+      <button type="button" data-theme-set="dark">Dark</button>
+      <button type="button" data-theme-set="auto">Auto</button>
+    </div>
+    <button type="button" class="split-btn" aria-pressed="false">Split view</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<div class="layout" id="layout">
+<div class="pane-main" id="paneMain">
+<main id="main">
+<h1><span class="kicker">EE 8350</span>Playground</h1><p class="lead">Your own VS Code in the browser, with a terminal and the simulators already installed. Run the course examples, change them, and write your own.</p><p><a class="bigbtn" href="https://codespaces.new/raghuavy/docs?quickstart=1">Open the playground in GitHub Codespaces</a></p><p>A place to run the course's SystemVerilog yourself. Every example here was checked with the tools this folder installs.</p>
+<h2>Open it</h2>
+<ol>
+<li>Go to <a href="https://codespaces.new/raghuavy/docs?quickstart=1">https://codespaces.new/raghuavy/docs?quickstart=1</a> and click Create codespace.</li>
+<li>Wait a few minutes the first time while it installs the simulators. You get VS Code in your browser with a terminal at the bottom.</li>
+<li>In the terminal, type <code>./run scratch.sv</code> and press Enter.</li>
+</ol>
+<p>Stop the codespace when you are done (top left menu, then Stop Current Codespace), so it does not use up your free monthly hours. Your files stay saved.</p>
+<h2>Run something</h2>
+<p><code>bash
+./run scratch.sv                         # build with Verilator and run
+./run -D BUG 12-uvm-adder/adder_tb.sv    # pass a define
+./run --wave 19-cdc/sync.sv              # also write wave.vcd, then click it to see waveforms
+./run --icarus 01-sv-review/basics.sv    # use Icarus Verilog, which keeps X values
+./run --vcs --uvm my_uvm_test.sv         # on the department servers with VCS and UVM</code></p>
+<p>The top module in each file must be called <code>tb</code>. Put your own experiments in <code>scratch.sv</code>, or copy any file and change it.</p>
+<h2>Examples by lecture</h2>
+<ol>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/01-sv-review/basics.sv"><code>01-sv-review/basics.sv</code></a> shows two state versus four state types, a packed struct, a union, increment operators, foreach, enums and packed arrays. Run it with <code>--icarus</code> to see X.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/02-oop/copies.sv"><code>02-oop/copies.sv</code></a> shows handle copy, shallow copy and deep copy, static members and super.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/03-randomization/constraints.sv"><code>03-randomization/constraints.sv</code></a> covers constraints solved together, a child class replacing a constraint, inline <code>with</code>, randcase and <code>$urandom_range</code>.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/03-randomization/dist_and_solve.sv"><code>03-randomization/dist_and_solve.sv</code></a> counts outcomes to show <code>dist</code> weights and <code>solve before</code>.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/04-coverage/bins.sv"><code>04-coverage/bins.sv</code></a> repeats the slide samples and prints the coverage for automatic bins, named bins, ignore_bins and a cross.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/05-interfaces/arbiter.sv"><code>05-interfaces/arbiter.sv</code></a> is an interface with modports and a clocking block driving a small arbiter. Try <code>--wave</code>.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/06-07-threads/forks.sv"><code>06-07-threads/forks.sv</code></a> covers join, join_any, join_none and the loop variable bug with its fix.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/06-07-threads/mailbox.sv"><code>06-07-threads/mailbox.sv</code></a> covers a mailbox with a handshake event and a one key semaphore.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/09-11-advanced-oop/virtual_and_callbacks.sv"><code>09-11-advanced-oop/virtual_and_callbacks.sv</code></a> covers virtual methods, <code>$cast</code>, the blueprint pattern and a drop callback.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/10-assertions/req_grant.sv"><code>10-assertions/req_grant.sv</code></a> shows overlapping requests where the assertion catches the first one, plus a cover property.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/12-uvm-adder/adder_tb.sv"><code>12-uvm-adder/adder_tb.sv</code></a> is the adder with a predictor and scoreboard in plain SystemVerilog. Run it again with <code>-D BUG</code>.</li>
+<li><a href="https://github.com/raghuavy/docs/blob/main/playground/19-cdc/sync.sv"><code>19-cdc/sync.sv</code></a> has two clocks, a two flop synchronizer and a Gray code counter with an assertion. Try <code>--wave</code>.</li>
+</ol>
+<h2>What the free tools cannot do</h2>
+<p>The playground uses Verilator 5.054 and Icarus Verilog 13. They handle classes, constraints, covergroups, threads, mailboxes and most assertions. Some things they do not cover:</p>
+<ul>
+<li>Full UVM (Lectures 8 and 12). Run UVM code with VCS on the department servers (<code>./run --vcs --uvm file.sv</code>), or on <a href="https://www.edaplayground.com">https://www.edaplayground.com</a> with a free account by choosing UVM 1.2 and a commercial simulator. The course's own UVM adder files are in the .tgz on Canvas.</li>
+<li>Verilator treats every X as 0. Use <code>--icarus</code> when you want to see X and Z.</li>
+<li>Most SVA works, including <code>##[m:n]</code>, <code>[*m]</code>, <code>[-&gt;m]</code>, <code>throughout</code>, <code>within</code>, <code>intersect</code> and <code>first_match</code>. The nonconsecutive repetition <code>[=m]</code> does not work in Verilator yet. Use VCS or EDA Playground for that one.</li>
+</ul>
+<h2>Without Codespaces</h2>
+<p>On any Ubuntu 24.04 machine or in WSL, run <code>bash .devcontainer/setup.sh</code> from the repo folder once, open a new terminal, then use <code>./run</code> the same way.</p>
+</main>
+
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19. Notes and progress are saved only in this browser.</footer>
+</div>
+<div class="divider" id="divider" role="separator" aria-orientation="vertical" aria-label="Drag to resize the two panes" tabindex="0"></div>
+<aside class="pane-side" id="paneSide" aria-label="Side pane">
+  <div class="side-bar">
+    <div class="seg" role="tablist" aria-label="Side pane shows">
+      <button type="button" role="tab" data-mode="notes" aria-selected="true">Notes</button>
+      <button type="button" role="tab" data-mode="page" aria-selected="false">Another page</button>
+    </div>
+    <button type="button" class="side-close">Close</button>
+  </div>
+  <section class="side-notes" data-panel="notes">
+    <div class="side-tools">
+      <span class="note-status" aria-live="polite">Notes for this page, saved in this browser</span>
+      <span class="tool-btns"><button type="button" class="note-dl">Download</button><button type="button" class="note-clear">Clear</button></span>
+    </div>
+    <textarea class="notes" data-indent="notes" data-key="playground" aria-label="Notes for this page" spellcheck="true"
+      placeholder="Type notes here.&#10;&#10;Enter keeps your indent. A line ending in : indents the next one.&#10;Tab indents, Shift+Tab outdents.&#10;Lines starting with - or 1. keep the list going.&#10;Press Esc, then Tab, to leave the box."></textarea>
+  </section>
+  <section class="side-page" data-panel="page" hidden>
+    <label class="side-pick">Show <select id="pagePick"><option value="index.html">Home, all lectures</option><option value="playground.html">Playground</option><option value="lectures/01-systemverilog-review.html">Lecture 1. SystemVerilog Review</option><option value="lectures/02-oop.html">Lecture 2. OOP in SystemVerilog</option><option value="lectures/03-randomization.html">Lecture 3. Randomization</option><option value="lectures/04-coverage-basics.html">Lecture 4. Functional Coverage Basics</option><option value="lectures/05-interfaces.html">Lecture 5. The Interface Construct</option><option value="lectures/06-07-threads.html">Lectures 6 and 7. Threads and Interprocess Communication</option><option value="lectures/08-uvm.html">Lecture 8. UVM</option><option value="lectures/09-11-advanced-oop.html">Lectures 9 to 11. Advanced OOP and Testbench Guidelines</option><option value="lectures/10-assertions-basics.html">Lecture 10. Assertions Basics</option><option value="lectures/12-uvm-adder.html">Lecture 12. UVM Adder Example</option><option value="lectures/12-advanced-interfaces.html">Lecture 12. Advanced Interfaces</option><option value="lectures/13-14-coverage-in-depth.html">Lectures 13 and 14. Functional Coverage in Depth</option><option value="lectures/14-16-advanced-assertions.html">Lectures 14 to 16. Advanced Assertions</option><option value="lectures/16-18-sva.html">Lectures 16 to 18. SVA</option><option value="lectures/19-clock-domain-crossing.html">Lecture 19. Clock Domain Crossing</option></select></label>
+    <iframe id="sideFrame" title="Another page of the guide"></iframe>
+  </section>
+</aside>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

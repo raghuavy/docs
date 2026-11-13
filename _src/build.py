@@ -45,6 +45,48 @@ SLUGS = {
 
 MD_EXT = ["md_in_html", "sane_lists"]
 
+CODESPACE_URL = "https://codespaces.new/raghuavy/docs?quickstart=1"
+REPO_URL = "https://github.com/raghuavy/docs/blob/main/playground/"
+
+# Playground examples to suggest on each lecture page: (command, file)
+TRY = {
+    "L2": [("./run --icarus 01-sv-review/basics.sv", "01-sv-review/basics.sv")],
+    "L3": [("./run 02-oop/copies.sv", "02-oop/copies.sv")],
+    "L4": [("./run 03-randomization/constraints.sv", "03-randomization/constraints.sv"),
+           ("./run 03-randomization/dist_and_solve.sv", "03-randomization/dist_and_solve.sv")],
+    "L5": [("./run 04-coverage/bins.sv", "04-coverage/bins.sv")],
+    "L6": [("./run --wave 05-interfaces/arbiter.sv", "05-interfaces/arbiter.sv")],
+    "L7": [("./run 06-07-threads/forks.sv", "06-07-threads/forks.sv"),
+           ("./run 06-07-threads/mailbox.sv", "06-07-threads/mailbox.sv")],
+    "L8": [("./run 12-uvm-adder/adder_tb.sv", "12-uvm-adder/adder_tb.sv")],
+    "L9": [("./run 09-11-advanced-oop/virtual_and_callbacks.sv", "09-11-advanced-oop/virtual_and_callbacks.sv")],
+    "L10": [("./run 10-assertions/req_grant.sv", "10-assertions/req_grant.sv")],
+    "L11": [("./run 12-uvm-adder/adder_tb.sv", "12-uvm-adder/adder_tb.sv"),
+            ("./run -D BUG 12-uvm-adder/adder_tb.sv", "12-uvm-adder/adder_tb.sv")],
+    "L12": [("./run --wave 05-interfaces/arbiter.sv", "05-interfaces/arbiter.sv")],
+    "L13": [("./run 04-coverage/bins.sv", "04-coverage/bins.sv")],
+    "L14": [("./run 10-assertions/req_grant.sv", "10-assertions/req_grant.sv")],
+    "L15": [("./run 10-assertions/req_grant.sv", "10-assertions/req_grant.sv")],
+    "L16": [("./run --wave 19-cdc/sync.sv", "19-cdc/sync.sv")],
+}
+UVM_NOTE = {"L8", "L11"}
+
+
+def try_box(key):
+    if key not in TRY:
+        return ""
+    cmds = "\n".join(c for c, _ in TRY[key])
+    files = sorted({f for _, f in TRY[key]})
+    links = ", ".join(f'<a href="{REPO_URL}{f}">{html.escape(f)}</a>' for f in files)
+    note = (" Full UVM needs a commercial simulator, so this example is the same testbench in plain SystemVerilog."
+            if key in UVM_NOTE else "")
+    return (
+        '<aside class="tryit"><div class="label">Try it yourself</div>'
+        f'<p>Open the <a href="../playground.html">playground</a>, a VS Code with its own terminal, and type{"" if len(TRY[key]) == 1 else " any of"}:</p>'
+        f"<pre><code>{html.escape(cmds)}</code></pre>"
+        f'<p class="tryfiles">Code: {links}.{note}</p></aside>'
+    )
+
 
 def md(text):
     return markdown.markdown(text, extensions=MD_EXT)
@@ -93,7 +135,7 @@ def page(title, body, depth, note_key, prev_link=None, next_link=None):
 <body>
 <a class="skip" href="#main">Skip to the content</a>
 <header class="site">
-  <a class="home" href="{up}index.html">EE 8350 Guide</a>
+  <nav class="sitenav" aria-label="Site"><a class="home" href="{up}index.html">EE 8350 Guide</a><a class="navlink" href="{up}playground.html">Playground</a></nav>
   <div class="controls">
     <div class="ctl sizer" role="group" aria-label="Text size">
       <span class="ctl-label">Text</span>
@@ -377,6 +419,7 @@ def build():
 
     PAGE_LIST.clear()
     PAGE_LIST.append(("index.html", "Home, all lectures"))
+    PAGE_LIST.append(("playground.html", "Playground"))
     PAGE_LIST.extend((f'lectures/{m["slug"]}.html', f'{m["num"]}. {m["name"]}') for m in meta)
     out_dir = ROOT / "lectures"
     out_dir.mkdir(exist_ok=True)
@@ -394,6 +437,7 @@ def build():
         head = (
             f'<h1><span class="kicker">{html.escape(m["num"])}</span>{html.escape(m["name"])}</h1>'
             f'<details class="toc"><summary>Steps in this lecture ({len(steps)})</summary><ol>{toc}</ol></details>'
+            + try_box(m["key"])
         )
         prev_link = (f'{meta[i - 1]["slug"]}.html', f'{meta[i - 1]["num"]}. {meta[i - 1]["name"]}') if i > 0 else None
         next_link = (f'{meta[i + 1]["slug"]}.html', f'{meta[i + 1]["num"]}. {meta[i + 1]["name"]}') if i + 1 < len(meta) else None
@@ -430,7 +474,20 @@ def build():
         + intro_html
     )
     (ROOT / "index.html").write_text(page("EE 8350 Guide", home, 0, "home"), encoding="utf-8")
-    print(f"built index.html and {len(meta)} lecture pages")
+    # Playground page, from playground/README.md
+    readme = (ROOT / "playground" / "README.md").read_text(encoding="utf-8")
+    readme = readme.split("\n", 1)[1]                          # drop the title line
+    readme = re.sub(r"(?<![(<\"])(https?://[^\s)]+?)([.,]?)(?=\s|$)", r"<\1>\2", readme)
+    readme = re.sub(r"`([0-9][^`]*?\.sv)`", lambda m: f'[`{m.group(1)}`]({REPO_URL}{m.group(1)})', readme)
+    pg_body = (
+        '<h1><span class="kicker">EE 8350</span>Playground</h1>'
+        '<p class="lead">Your own VS Code in the browser, with a terminal and the simulators already installed. '
+        "Run the course examples, change them, and write your own.</p>"
+        f'<p><a class="bigbtn" href="{CODESPACE_URL}">Open the playground in GitHub Codespaces</a></p>'
+        + md(readme)
+    )
+    (ROOT / "playground.html").write_text(page("Playground | EE 8350 Guide", pg_body, 0, "playground"), encoding="utf-8")
+    print(f"built index.html, playground.html and {len(meta)} lecture pages")
 
 
 if __name__ == "__main__":

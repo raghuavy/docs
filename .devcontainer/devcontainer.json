@@ -1,0 +1,21 @@
+{
+  "name": "EE 8350 playground",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "hostRequirements": { "cpus": 2 },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "remoteEnv": { "PATH": "/opt/eda/bin:${containerEnv:PATH}" },
+  "customizations": {
+    "vscode": {
+      "extensions": ["mshr-h.veriloghdl", "wavetrace.wavetrace"],
+      "settings": {
+        "files.associations": { "*.sv": "systemverilog" },
+        "terminal.integrated.cwd": "${workspaceFolder}/playground",
+        "editor.fontSize": 16,
+        "terminal.integrated.fontSize": 15,
+        "editor.tabSize": 2,
+        "editor.minimap.enabled": false
+      }
+    },
+    "codespaces": { "openFiles": ["playground/README.md", "playground/scratch.sv"] }
+  }
+}
