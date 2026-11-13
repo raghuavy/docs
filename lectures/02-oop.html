@@ -4,23 +4,35 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lecture 2. OOP in SystemVerilog | EE 8350 Guide</title>
-<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<script>(function(){var d=document.documentElement;try{var s=localStorage.getItem("ee8350-size");if(s)d.setAttribute("data-size",s);var t=localStorage.getItem("ee8350-theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t);var sp=localStorage.getItem("ee8350-split");if(sp===null)sp=window.innerWidth>=1000?"on":"off";if(sp==="on"&&window.innerWidth>=1000)d.classList.add("split");var w=localStorage.getItem("ee8350-splitw");if(w)d.style.setProperty("--split-w",w+"%");}catch(e){}if(window.self!==window.top){d.classList.add("embedded");d.classList.remove("split");}})();</script>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to the content</a>
 <header class="site">
   <a class="home" href="../index.html">EE 8350 Guide</a>
-  <div class="sizer" role="group" aria-label="Text size">
-    <span>Text</span>
-    <button type="button" data-size="1" aria-label="Smaller text">A</button>
-    <button type="button" data-size="2" aria-label="Normal text">A</button>
-    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  <div class="controls">
+    <div class="ctl sizer" role="group" aria-label="Text size">
+      <span class="ctl-label">Text</span>
+      <button type="button" data-size="1" aria-label="Smaller text">A</button>
+      <button type="button" data-size="2" aria-label="Normal text">A</button>
+      <button type="button" data-size="3" aria-label="Larger text">A</button>
+    </div>
+    <div class="ctl themer" role="group" aria-label="Color theme">
+      <span class="ctl-label">Theme</span>
+      <button type="button" data-theme-set="light">Light</button>
+      <button type="button" data-theme-set="dark">Dark</button>
+      <button type="button" data-theme-set="auto">Auto</button>
+    </div>
+    <button type="button" class="split-btn" aria-pressed="false">Split view</button>
   </div>
 </header>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<div class="layout" id="layout">
+<div class="pane-main" id="paneMain">
 <main id="main">
-<h1><span class="kicker">Lecture 2</span>OOP in SystemVerilog</h1><details class="toc"><summary>Steps in this lecture (9)</summary><ol><li><a href="#step-1">The vocabulary</a></li><li><a href="#step-2">Why bother with OOP</a></li><li><a href="#step-3">Declare, construct and use</a></li><li><a href="#step-4">Inheritance with extends and super</a></li><li><a href="#step-5">Static variables</a></li><li><a href="#step-6">The keyword this</a></li><li><a href="#step-7">Nested classes and extern methods</a></li><li><a href="#step-8">Arrays of handles</a></li><li><a href="#step-9">Three levels of copying</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">A class bundles data together with the code that works on that data. Testbenches use classes because a transaction (one packet, one bus read) is naturally a bundle of fields plus helper methods.</p>
+<h1><span class="kicker">Lecture 2</span>OOP in SystemVerilog</h1><details class="toc"><summary>Steps in this lecture (9)</summary><ol><li><a href="#step-1">The vocabulary</a></li><li><a href="#step-2">Why bother with OOP</a></li><li><a href="#step-3">Declare, construct and use</a></li><li><a href="#step-4">Inheritance with extends and super</a></li><li><a href="#step-5">Static variables</a></li><li><a href="#step-6">The keyword this</a></li><li><a href="#step-7">Nested classes and extern methods</a></li><li><a href="#step-8">Arrays of handles</a></li><li><a href="#step-9">Three levels of copying</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Problems</a></li></ol></details><p class="lead">A class bundles data together with the code that works on that data. Testbenches use classes because a transaction (one packet, one bus read) is naturally a bundle of fields plus helper methods.</p>
 <h3 id="step-1"><span class="stepno">Step 1</span>The vocabulary</h3>
 <ul>
 <li>A class is the blueprint. Think of it as the plans for a building.</li>
@@ -181,24 +193,15 @@ end</code></pre></details></div>
 <li>A child method with the same name hides the parent's method unless you call super.</li>
 </ul>
 </section>
-<h3 id="practice">Practice</h3>
-<p>Try each one first, then open the answer.</p>
-<ol class="practice">
-<li><div>In one sentence each, what is the difference between a class, an object and a handle?</div><details class="answer"><summary>Show answer</summary><div><p>A class is the type, an object is one built instance of it, and a handle is the variable that points at an object.</p></div></details></li>
-<li><div>What happens when this runs? <code>simple s; s.data = 5;</code></div><details class="answer"><summary>Show answer</summary><div><p>A runtime null handle error, because no object was built.</p></div></details></li>
-<li><div>A class has <code>static int count;</code> and its new() does count++. After three objects are built, what does count read through the first object?</div><details class="answer"><summary>Show answer</summary><div><ol start="3">
+<section class="problems" id="practice" data-lecture="L3"><div class="prob-head"><h3>Problems</h3><span class="prob-progress">0 of 7 solved</span></div><p class="prob-intro">Pick a problem from the list. Short answers are checked for you. For code and explanations, you compare with the reference and mark it yourself.</p><ol class="prob-list"><li><button type="button" class="prob-row" data-i="0" aria-controls="p-L3-1"><span class="pnum">1.</span><span class="ptitle">Class, object and handle</span><span class="diff easy">Easy</span><span class="pstat" aria-label="not solved yet"></span></button></li><li><button type="button" class="prob-row" data-i="1" aria-controls="p-L3-2"><span class="pnum">2.</span><span class="ptitle">Using a handle before new</span><span class="diff easy">Easy</span><span class="pstat" aria-label="not solved yet"></span></button></li><li><button type="button" class="prob-row" data-i="2" aria-controls="p-L3-3"><span class="pnum">3.</span><span class="ptitle">Static counter</span><span class="diff easy">Easy</span><span class="pstat" aria-label="not solved yet"></span></button></li><li><button type="button" class="prob-row" data-i="3" aria-controls="p-L3-4"><span class="pnum">4.</span><span class="ptitle">Copying a handle</span><span class="diff medium">Medium</span><span class="pstat" aria-label="not solved yet"></span></button></li><li><button type="button" class="prob-row" data-i="4" aria-controls="p-L3-5"><span class="pnum">5.</span><span class="ptitle">Shallow copy, plain field</span><span class="diff medium">Medium</span><span class="pstat" aria-label="not solved yet"></span></button></li><li><button type="button" class="prob-row" data-i="5" aria-controls="p-L3-6"><span class="pnum">6.</span><span class="ptitle">Shallow copy, nested object</span><span class="diff hard">Hard</span><span class="pstat" aria-label="not solved yet"></span></button></li><li><button type="button" class="prob-row" data-i="6" aria-controls="p-L3-7"><span class="pnum">7.</span><span class="ptitle">Write a deep copy</span><span class="diff hard">Hard</span><span class="pstat" aria-label="not solved yet"></span></button></li></ol><div class="prob-panels"><div class="prob" id="p-L3-1" data-i="0" data-id="p-L3-1" data-check="{&quot;t&quot;: &quot;explain&quot;}"><div class="prob-title"><h4>1. Class, object and handle</h4><span class="diff easy">Easy</span></div><div class="prob-statement"><p>In one sentence each, what is the difference between a class, an object and a handle?</p><p class="hint">Write your answer, press Submit, then compare with the reference solution and mark it.</p></div><div class="editor prose-ed"><textarea data-indent="notes" data-key="ans-p-L3-1" aria-label="Your answer" placeholder="Write your answer in your own words."></textarea></div><div class="prob-actions"><button type="button" class="btn primary submit">Submit</button><button type="button" class="btn show-sol">Show solution</button></div><div class="verdict" role="status" aria-live="polite"></div><div class="solution" hidden><div class="label">Solution</div><p>A class is the type, an object is one built instance of it, and a handle is the variable that points at an object.</p></div><div class="prob-nav"><button type="button" class="btn prev-p">Previous problem</button><button type="button" class="btn next-p">Next problem</button></div></div><div class="prob" id="p-L3-2" data-i="1" data-id="p-L3-2" data-check="{&quot;t&quot;: &quot;choice&quot;, &quot;o&quot;: [&quot;data becomes 5&quot;, &quot;a compile error&quot;, &quot;a null handle error at run time&quot;, &quot;nothing happens&quot;], &quot;a&quot;: 2}"><div class="prob-title"><h4>2. Using a handle before new</h4><span class="diff easy">Easy</span></div><div class="prob-statement"><p>What happens when this runs? <code>simple s; s.data = 5;</code></p></div><fieldset class="opts"><legend class="sr">Options</legend><label class="opt"><input type="radio" name="p-L3-2" value="0"><span>data becomes 5</span></label><label class="opt"><input type="radio" name="p-L3-2" value="1"><span>a compile error</span></label><label class="opt"><input type="radio" name="p-L3-2" value="2"><span>a null handle error at run time</span></label><label class="opt"><input type="radio" name="p-L3-2" value="3"><span>nothing happens</span></label></fieldset><div class="prob-actions"><button type="button" class="btn primary submit">Submit</button><button type="button" class="btn show-sol">Show solution</button></div><div class="verdict" role="status" aria-live="polite"></div><div class="solution" hidden><div class="label">Solution</div><p>A runtime null handle error, because no object was built.</p></div><div class="prob-nav"><button type="button" class="btn prev-p">Previous problem</button><button type="button" class="btn next-p">Next problem</button></div></div><div class="prob" id="p-L3-3" data-i="2" data-id="p-L3-3" data-check="{&quot;t&quot;: &quot;fields&quot;, &quot;f&quot;: [{&quot;l&quot;: &quot;count reads&quot;, &quot;a&quot;: [3]}]}"><div class="prob-title"><h4>3. Static counter</h4><span class="diff easy">Easy</span></div><div class="prob-statement"><p>A class has <code>static int count;</code> and its new() does count++. After three objects are built, what does count read through the first object?</p></div><div class="fields"><div class="fld"><label for="p-L3-3-f0">count reads</label><input id="p-L3-3-f0" data-k="0" type="text" autocomplete="off" spellcheck="false"></div></div><div class="prob-actions"><button type="button" class="btn primary submit">Submit</button><button type="button" class="btn show-sol">Show solution</button></div><div class="verdict" role="status" aria-live="polite"></div><div class="solution" hidden><div class="label">Solution</div><ol start="3">
 <li>Every object shares the one static count.</li>
-</ol></div></details></li>
-<li><div>Class A has <code>int x;</code>. You run <code>a1.x = 8; a2 = a1; a2.x = 6;</code>. What does a1.x read?</div><details class="answer"><summary>Show answer</summary><div><ol start="6">
+</ol></div><div class="prob-nav"><button type="button" class="btn prev-p">Previous problem</button><button type="button" class="btn next-p">Next problem</button></div></div><div class="prob" id="p-L3-4" data-i="3" data-id="p-L3-4" data-check="{&quot;t&quot;: &quot;fields&quot;, &quot;f&quot;: [{&quot;l&quot;: &quot;a1.x reads&quot;, &quot;a&quot;: [6]}]}"><div class="prob-title"><h4>4. Copying a handle</h4><span class="diff medium">Medium</span></div><div class="prob-statement"><p>Class A has <code>int x;</code>. You run <code>a1.x = 8; a2 = a1; a2.x = 6;</code>. What does a1.x read?</p></div><div class="fields"><div class="fld"><label for="p-L3-4-f0">a1.x reads</label><input id="p-L3-4-f0" data-k="0" type="text" autocomplete="off" spellcheck="false"></div></div><div class="prob-actions"><button type="button" class="btn primary submit">Submit</button><button type="button" class="btn show-sol">Show solution</button></div><div class="verdict" role="status" aria-live="polite"></div><div class="solution" hidden><div class="label">Solution</div><ol start="6">
 <li>Both handles point at one object.</li>
-</ol></div></details></li>
-<li><div>Same class, but now <code>a2 = new a1;</code> before <code>a2.x = 6;</code>. What does a1.x read?</div><details class="answer"><summary>Show answer</summary><div><ol start="8">
+</ol></div><div class="prob-nav"><button type="button" class="btn prev-p">Previous problem</button><button type="button" class="btn next-p">Next problem</button></div></div><div class="prob" id="p-L3-5" data-i="4" data-id="p-L3-5" data-check="{&quot;t&quot;: &quot;fields&quot;, &quot;f&quot;: [{&quot;l&quot;: &quot;a1.x reads&quot;, &quot;a&quot;: [8]}]}"><div class="prob-title"><h4>5. Shallow copy, plain field</h4><span class="diff medium">Medium</span></div><div class="prob-statement"><p>Same class, but now <code>a2 = new a1;</code> before <code>a2.x = 6;</code>. What does a1.x read?</p></div><div class="fields"><div class="fld"><label for="p-L3-5-f0">a1.x reads</label><input id="p-L3-5-f0" data-k="0" type="text" autocomplete="off" spellcheck="false"></div></div><div class="prob-actions"><button type="button" class="btn primary submit">Submit</button><button type="button" class="btn show-sol">Show solution</button></div><div class="verdict" role="status" aria-live="polite"></div><div class="solution" hidden><div class="label">Solution</div><ol start="8">
 <li>new a1 built a separate object.</li>
-</ol></div></details></li>
-<li><div>Class A also holds a handle b to class B, which has <code>int y;</code>. After <code>a2 = new a1; a2.b.y = 9;</code>, what does a1.b.y read and why?</div><details class="answer"><summary>Show answer</summary><div><ol start="9">
+</ol></div><div class="prob-nav"><button type="button" class="btn prev-p">Previous problem</button><button type="button" class="btn next-p">Next problem</button></div></div><div class="prob" id="p-L3-6" data-i="5" data-id="p-L3-6" data-check="{&quot;t&quot;: &quot;fields&quot;, &quot;f&quot;: [{&quot;l&quot;: &quot;a1.b.y reads&quot;, &quot;a&quot;: [9]}]}"><div class="prob-title"><h4>6. Shallow copy, nested object</h4><span class="diff hard">Hard</span></div><div class="prob-statement"><p>Class A also holds a handle b to class B, which has <code>int y;</code>. After <code>a2 = new a1; a2.b.y = 9;</code>, what does a1.b.y read and why?</p></div><div class="fields"><div class="fld"><label for="p-L3-6-f0">a1.b.y reads</label><input id="p-L3-6-f0" data-k="0" type="text" autocomplete="off" spellcheck="false"></div></div><div class="prob-actions"><button type="button" class="btn primary submit">Submit</button><button type="button" class="btn show-sol">Show solution</button></div><div class="verdict" role="status" aria-live="polite"></div><div class="solution" hidden><div class="label">Solution</div><ol start="9">
 <li>The shallow copy copied the handle b, so both objects share the same B.</li>
-</ol></div></details></li>
-<li><div>Write a deep copy method for class A from problem 6.</div><details class="answer"><summary>Show answer</summary><div><p>One version is below.</p>
+</ol></div><div class="prob-nav"><button type="button" class="btn prev-p">Previous problem</button><button type="button" class="btn next-p">Next problem</button></div></div><div class="prob" id="p-L3-7" data-i="6" data-id="p-L3-7" data-check="{&quot;t&quot;: &quot;code&quot;}"><div class="prob-title"><h4>7. Write a deep copy</h4><span class="diff hard">Hard</span></div><div class="prob-statement"><p>Write a deep copy method for class A from problem 6.</p><p class="hint">Write your answer, press Submit, then compare with the reference solution and mark it.</p></div><div class="editor code-ed"><pre class="gutter" aria-hidden="true">1</pre><textarea data-indent="code" data-key="ans-p-L3-7" spellcheck="false" aria-label="Your code" placeholder="Write your SystemVerilog here. Enter keeps the indent, Tab indents."></textarea></div><div class="prob-actions"><button type="button" class="btn primary submit">Submit</button><button type="button" class="btn show-sol">Show solution</button></div><div class="verdict" role="status" aria-live="polite"></div><div class="solution" hidden><div class="label">Solution</div><p>One version is below.</p>
 <div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>copy():
     build a new A
     copy x across
@@ -209,11 +212,34 @@ end</code></pre></details></div>
   copy.x = x;
   copy.b = new();
   copy.b.y = b.y;
-endfunction</code></pre></details></div></div></details></li>
-</ol>
+endfunction</code></pre></details></div></div><div class="prob-nav"><button type="button" class="btn prev-p">Previous problem</button><button type="button" class="btn next-p">Next problem</button></div></div></div></section>
 </main>
 <nav class="pager" aria-label="Lecture navigation"><a class="prev" href="01-systemverilog-review.html"><span class="dir">Previous</span>Lecture 1. SystemVerilog Review</a><a class="next" href="03-randomization.html"><span class="dir">Next</span>Lecture 3. Randomization</a></nav>
-<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19. Notes and progress are saved only in this browser.</footer>
+</div>
+<div class="divider" id="divider" role="separator" aria-orientation="vertical" aria-label="Drag to resize the two panes" tabindex="0"></div>
+<aside class="pane-side" id="paneSide" aria-label="Side pane">
+  <div class="side-bar">
+    <div class="seg" role="tablist" aria-label="Side pane shows">
+      <button type="button" role="tab" data-mode="notes" aria-selected="true">Notes</button>
+      <button type="button" role="tab" data-mode="page" aria-selected="false">Another page</button>
+    </div>
+    <button type="button" class="side-close">Close</button>
+  </div>
+  <section class="side-notes" data-panel="notes">
+    <div class="side-tools">
+      <span class="note-status" aria-live="polite">Notes for this page, saved in this browser</span>
+      <span class="tool-btns"><button type="button" class="note-dl">Download</button><button type="button" class="note-clear">Clear</button></span>
+    </div>
+    <textarea class="notes" data-indent="notes" data-key="02-oop" aria-label="Notes for this page" spellcheck="true"
+      placeholder="Type notes here.&#10;&#10;Enter keeps your indent. A line ending in : indents the next one.&#10;Tab indents, Shift+Tab outdents.&#10;Lines starting with - or 1. keep the list going.&#10;Press Esc, then Tab, to leave the box."></textarea>
+  </section>
+  <section class="side-page" data-panel="page" hidden>
+    <label class="side-pick">Show <select id="pagePick"><option value="../index.html">Home, all lectures</option><option value="../lectures/01-systemverilog-review.html">Lecture 1. SystemVerilog Review</option><option value="../lectures/02-oop.html">Lecture 2. OOP in SystemVerilog</option><option value="../lectures/03-randomization.html">Lecture 3. Randomization</option><option value="../lectures/04-coverage-basics.html">Lecture 4. Functional Coverage Basics</option><option value="../lectures/05-interfaces.html">Lecture 5. The Interface Construct</option><option value="../lectures/06-07-threads.html">Lectures 6 and 7. Threads and Interprocess Communication</option><option value="../lectures/08-uvm.html">Lecture 8. UVM</option><option value="../lectures/09-11-advanced-oop.html">Lectures 9 to 11. Advanced OOP and Testbench Guidelines</option><option value="../lectures/10-assertions-basics.html">Lecture 10. Assertions Basics</option><option value="../lectures/12-uvm-adder.html">Lecture 12. UVM Adder Example</option><option value="../lectures/12-advanced-interfaces.html">Lecture 12. Advanced Interfaces</option><option value="../lectures/13-14-coverage-in-depth.html">Lectures 13 and 14. Functional Coverage in Depth</option><option value="../lectures/14-16-advanced-assertions.html">Lectures 14 to 16. Advanced Assertions</option><option value="../lectures/16-18-sva.html">Lectures 16 to 18. SVA</option><option value="../lectures/19-clock-domain-crossing.html">Lecture 19. Clock Domain Crossing</option></select></label>
+    <iframe id="sideFrame" title="Another page of the guide"></iframe>
+  </section>
+</aside>
+</div>
 <script src="../assets/site.js"></script>
 </body>
 </html>

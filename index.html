@@ -4,21 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EE 8350 Guide</title>
-<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<script>(function(){var d=document.documentElement;try{var s=localStorage.getItem("ee8350-size");if(s)d.setAttribute("data-size",s);var t=localStorage.getItem("ee8350-theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t);var sp=localStorage.getItem("ee8350-split");if(sp===null)sp=window.innerWidth>=1000?"on":"off";if(sp==="on"&&window.innerWidth>=1000)d.classList.add("split");var w=localStorage.getItem("ee8350-splitw");if(w)d.style.setProperty("--split-w",w+"%");}catch(e){}if(window.self!==window.top){d.classList.add("embedded");d.classList.remove("split");}})();</script>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to the content</a>
 <header class="site">
   <a class="home" href="index.html">EE 8350 Guide</a>
-  <div class="sizer" role="group" aria-label="Text size">
-    <span>Text</span>
-    <button type="button" data-size="1" aria-label="Smaller text">A</button>
-    <button type="button" data-size="2" aria-label="Normal text">A</button>
-    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  <div class="controls">
+    <div class="ctl sizer" role="group" aria-label="Text size">
+      <span class="ctl-label">Text</span>
+      <button type="button" data-size="1" aria-label="Smaller text">A</button>
+      <button type="button" data-size="2" aria-label="Normal text">A</button>
+      <button type="button" data-size="3" aria-label="Larger text">A</button>
+    </div>
+    <div class="ctl themer" role="group" aria-label="Color theme">
+      <span class="ctl-label">Theme</span>
+      <button type="button" data-theme-set="light">Light</button>
+      <button type="button" data-theme-set="dark">Dark</button>
+      <button type="button" data-theme-set="auto">Auto</button>
+    </div>
+    <button type="button" class="split-btn" aria-pressed="false">Split view</button>
   </div>
 </header>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<div class="layout" id="layout">
+<div class="pane-main" id="paneMain">
 <main id="main">
 <h1><span class="kicker">EE 8350, Fall 2026</span>Advanced Verification, Lectures 1 to 19</h1><p class="lead">A calm, one lecture at a time walkthrough of the course slides. Pick a lecture below, or read the short orientation first.</p><h2 id="lectures">Lectures</h2><ol class="lectures"><li><a href="lectures/01-systemverilog-review.html"><span class="num">Lecture 1</span><span class="name">SystemVerilog Review</span><span class="gist">SystemVerilog is Verilog 2001 plus a large set of features for modeling and verification.</span></a></li><li><a href="lectures/02-oop.html"><span class="num">Lecture 2</span><span class="name">OOP in SystemVerilog</span><span class="gist">A class bundles data together with the code that works on that data.</span></a></li><li><a href="lectures/03-randomization.html"><span class="num">Lecture 3</span><span class="name">Randomization</span><span class="gist">You cannot try every input on a big design, so you let the simulator pick random inputs inside rules you write.</span></a></li><li><a href="lectures/04-coverage-basics.html"><span class="num">Lecture 4</span><span class="name">Functional Coverage Basics</span><span class="gist">Random stimulus raises an obvious question, which is what did it actually test.</span></a></li><li><a href="lectures/05-interfaces.html"><span class="num">Lecture 5</span><span class="name">The Interface Construct</span><span class="gist">An interface bundles the wires between the testbench and the DUT into one named object.</span></a></li><li><a href="lectures/06-07-threads.html"><span class="num">Lectures 6 and 7</span><span class="name">Threads and Interprocess Communication</span><span class="gist">A testbench is many blocks running at the same time, such as a generator, a driver and a monitor.</span></a></li><li><a href="lectures/08-uvm.html"><span class="num">Lecture 8</span><span class="name">UVM</span><span class="gist">UVM, the Universal Verification Methodology, is a standard library of SystemVerilog base classes from the standards group Accellera.</span></a></li><li><a href="lectures/09-11-advanced-oop.html"><span class="num">Lectures 9 to 11</span><span class="name">Advanced OOP and Testbench Guidelines</span><span class="gist">This lecture shows how inheritance and virtual methods let one testbench run many different tests without being edited.</span></a></li><li><a href="lectures/10-assertions-basics.html"><span class="num">Lecture 10</span><span class="name">Assertions Basics</span><span class="gist">An assertion is a statement of something that must always be true about the design.</span></a></li><li><a href="lectures/12-uvm-adder.html"><span class="num">Lecture 12</span><span class="name">UVM Adder Example</span><span class="gist">This lecture fills in the Lecture 8 templates with a complete, working UVM testbench for a 4 bit adder.</span></a></li><li><a href="lectures/12-advanced-interfaces.html"><span class="num">Lecture 12</span><span class="name">Advanced Interfaces</span><span class="gist">A virtual interface is a handle that points to a real interface, the way a class handle points to an object.</span></a></li><li><a href="lectures/13-14-coverage-in-depth.html"><span class="num">Lectures 13 and 14</span><span class="name">Functional Coverage in Depth</span><span class="gist">This lecture revisits Lecture 4 using chapter 9 of Spear and Tumbush, and adds the workflow around coverage.</span></a></li><li><a href="lectures/14-16-advanced-assertions.html"><span class="num">Lectures 14 to 16</span><span class="name">Advanced Assertions</span><span class="gist">This deck starts by repeating the Lecture 10 slides, so read that section first.</span></a></li><li><a href="lectures/16-18-sva.html"><span class="num">Lectures 16 to 18</span><span class="name">SVA</span><span class="gist">This deck turns assertions into a working toolkit.</span></a></li><li><a href="lectures/19-clock-domain-crossing.html"><span class="num">Lecture 19</span><span class="name">Clock Domain Crossing</span><span class="gist">A clock domain crossing (CDC) happens whenever a signal launched by a flip flop on one clock is captured by a flip flop on a different clock.</span></a></li></ol><h2 id="orientation">Orientation</h2><p>Every lecture in this course builds toward one skill. You learn to write a testbench that drives a design with random inputs, checks the answers by itself, and tells you how much of the design you actually exercised.</p>
 <p>A few words show up in every lecture, so here they are once.</p>
@@ -40,12 +52,36 @@
 <li>A special topic. Lecture 19 covers clock domain crossing, where signals move between unrelated clocks.</li>
 </ol>
 <h3>How each page is laid out</h3>
-<p>Each lecture section follows the slide order. It starts with the one sentence idea, then walks through the slides in small steps with short code examples. It ends with traps people fall into and practice problems that get harder as you go. Answers stay hidden until you open them.</p>
+<p>Each lecture section follows the slide order. It starts with the one sentence idea, then walks through the slides in small steps with short code examples. It ends with traps people fall into and a set of problems that get harder as you go, checked in the page like LeetCode.</p>
 <p>Some slides are pictures of code from the textbook (Spear and Tumbush, SystemVerilog for Verification), so for those the guide writes its own example that shows the same idea.</p>
 <p>Every code example has a pseudocode version in plain words first. The real SystemVerilog sits underneath behind a Show button, so you only see it when you want it.</p>
 </main>
 
-<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19. Notes and progress are saved only in this browser.</footer>
+</div>
+<div class="divider" id="divider" role="separator" aria-orientation="vertical" aria-label="Drag to resize the two panes" tabindex="0"></div>
+<aside class="pane-side" id="paneSide" aria-label="Side pane">
+  <div class="side-bar">
+    <div class="seg" role="tablist" aria-label="Side pane shows">
+      <button type="button" role="tab" data-mode="notes" aria-selected="true">Notes</button>
+      <button type="button" role="tab" data-mode="page" aria-selected="false">Another page</button>
+    </div>
+    <button type="button" class="side-close">Close</button>
+  </div>
+  <section class="side-notes" data-panel="notes">
+    <div class="side-tools">
+      <span class="note-status" aria-live="polite">Notes for this page, saved in this browser</span>
+      <span class="tool-btns"><button type="button" class="note-dl">Download</button><button type="button" class="note-clear">Clear</button></span>
+    </div>
+    <textarea class="notes" data-indent="notes" data-key="home" aria-label="Notes for this page" spellcheck="true"
+      placeholder="Type notes here.&#10;&#10;Enter keeps your indent. A line ending in : indents the next one.&#10;Tab indents, Shift+Tab outdents.&#10;Lines starting with - or 1. keep the list going.&#10;Press Esc, then Tab, to leave the box."></textarea>
+  </section>
+  <section class="side-page" data-panel="page" hidden>
+    <label class="side-pick">Show <select id="pagePick"><option value="index.html">Home, all lectures</option><option value="lectures/01-systemverilog-review.html">Lecture 1. SystemVerilog Review</option><option value="lectures/02-oop.html">Lecture 2. OOP in SystemVerilog</option><option value="lectures/03-randomization.html">Lecture 3. Randomization</option><option value="lectures/04-coverage-basics.html">Lecture 4. Functional Coverage Basics</option><option value="lectures/05-interfaces.html">Lecture 5. The Interface Construct</option><option value="lectures/06-07-threads.html">Lectures 6 and 7. Threads and Interprocess Communication</option><option value="lectures/08-uvm.html">Lecture 8. UVM</option><option value="lectures/09-11-advanced-oop.html">Lectures 9 to 11. Advanced OOP and Testbench Guidelines</option><option value="lectures/10-assertions-basics.html">Lecture 10. Assertions Basics</option><option value="lectures/12-uvm-adder.html">Lecture 12. UVM Adder Example</option><option value="lectures/12-advanced-interfaces.html">Lecture 12. Advanced Interfaces</option><option value="lectures/13-14-coverage-in-depth.html">Lectures 13 and 14. Functional Coverage in Depth</option><option value="lectures/14-16-advanced-assertions.html">Lectures 14 to 16. Advanced Assertions</option><option value="lectures/16-18-sva.html">Lectures 16 to 18. SVA</option><option value="lectures/19-clock-domain-crossing.html">Lecture 19. Clock Domain Crossing</option></select></label>
+    <iframe id="sideFrame" title="Another page of the guide"></iframe>
+  </section>
+</aside>
+</div>
 <script src="assets/site.js"></script>
 </body>
 </html>

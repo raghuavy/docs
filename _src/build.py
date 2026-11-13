@@ -8,6 +8,7 @@ Writes  index.html and lectures/*.html
 Content added on top of the markdown lives in _src/pseudocode.py and _src/visuals.py.
 """
 import html
+import json
 import re
 import sys
 from pathlib import Path
@@ -19,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pseudocode import PSEUDO  # noqa: E402
 from visuals import FIGURES, ARROW_DEFS, course_map  # noqa: E402
+from problems import PROBLEMS  # noqa: E402
 
 SOURCE = ROOT / "EE 8350_Lecture_Guide.md"
 
@@ -60,7 +62,10 @@ def code_html(code):
     return f"<pre><code>{esc}</code></pre>"
 
 
-def page(title, body, depth, prev_link=None, next_link=None):
+PAGE_LIST = []  # (root relative path, label), filled in build()
+
+
+def page(title, body, depth, note_key, prev_link=None, next_link=None):
     up = "../" * depth
     pager = ""
     if prev_link or next_link:
@@ -74,32 +79,69 @@ def page(title, body, depth, prev_link=None, next_link=None):
         else:
             parts.append('<span style="flex:1"></span>')
         pager = '<nav class="pager" aria-label="Lecture navigation">' + "".join(parts) + "</nav>"
+    options = "".join(f'<option value="{up}{path}">{html.escape(label)}</option>' for path, label in PAGE_LIST)
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)}</title>
-<script>try{{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}}catch(e){{}}</script>
+<script>(function(){{var d=document.documentElement;try{{var s=localStorage.getItem("ee8350-size");if(s)d.setAttribute("data-size",s);var t=localStorage.getItem("ee8350-theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t);var sp=localStorage.getItem("ee8350-split");if(sp===null)sp=window.innerWidth>=1000?"on":"off";if(sp==="on"&&window.innerWidth>=1000)d.classList.add("split");var w=localStorage.getItem("ee8350-splitw");if(w)d.style.setProperty("--split-w",w+"%");}}catch(e){{}}if(window.self!==window.top){{d.classList.add("embedded");d.classList.remove("split");}}}})();</script>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="{up}assets/style.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to the content</a>
 <header class="site">
   <a class="home" href="{up}index.html">EE 8350 Guide</a>
-  <div class="sizer" role="group" aria-label="Text size">
-    <span>Text</span>
-    <button type="button" data-size="1" aria-label="Smaller text">A</button>
-    <button type="button" data-size="2" aria-label="Normal text">A</button>
-    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  <div class="controls">
+    <div class="ctl sizer" role="group" aria-label="Text size">
+      <span class="ctl-label">Text</span>
+      <button type="button" data-size="1" aria-label="Smaller text">A</button>
+      <button type="button" data-size="2" aria-label="Normal text">A</button>
+      <button type="button" data-size="3" aria-label="Larger text">A</button>
+    </div>
+    <div class="ctl themer" role="group" aria-label="Color theme">
+      <span class="ctl-label">Theme</span>
+      <button type="button" data-theme-set="light">Light</button>
+      <button type="button" data-theme-set="dark">Dark</button>
+      <button type="button" data-theme-set="auto">Auto</button>
+    </div>
+    <button type="button" class="split-btn" aria-pressed="false">Split view</button>
   </div>
 </header>
 {ARROW_DEFS}
+<div class="layout" id="layout">
+<div class="pane-main" id="paneMain">
 <main id="main">
 {body}
 </main>
 {pager}
-<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19. Notes and progress are saved only in this browser.</footer>
+</div>
+<div class="divider" id="divider" role="separator" aria-orientation="vertical" aria-label="Drag to resize the two panes" tabindex="0"></div>
+<aside class="pane-side" id="paneSide" aria-label="Side pane">
+  <div class="side-bar">
+    <div class="seg" role="tablist" aria-label="Side pane shows">
+      <button type="button" role="tab" data-mode="notes" aria-selected="true">Notes</button>
+      <button type="button" role="tab" data-mode="page" aria-selected="false">Another page</button>
+    </div>
+    <button type="button" class="side-close">Close</button>
+  </div>
+  <section class="side-notes" data-panel="notes">
+    <div class="side-tools">
+      <span class="note-status" aria-live="polite">Notes for this page, saved in this browser</span>
+      <span class="tool-btns"><button type="button" class="note-dl">Download</button><button type="button" class="note-clear">Clear</button></span>
+    </div>
+    <textarea class="notes" data-indent="notes" data-key="{note_key}" aria-label="Notes for this page" spellcheck="true"
+      placeholder="Type notes here.&#10;&#10;Enter keeps your indent. A line ending in : indents the next one.&#10;Tab indents, Shift+Tab outdents.&#10;Lines starting with - or 1. keep the list going.&#10;Press Esc, then Tab, to leave the box."></textarea>
+  </section>
+  <section class="side-page" data-panel="page" hidden>
+    <label class="side-pick">Show <select id="pagePick">{options}</select></label>
+    <iframe id="sideFrame" title="Another page of the guide"></iframe>
+  </section>
+</aside>
+</div>
 <script src="{up}assets/site.js"></script>
 </body>
 </html>
@@ -186,8 +228,48 @@ def insert_figures(body, key, store):
     return "\n".join(lines)
 
 
-def build_practice(body):
-    """Turn the Practice and Answers lists into questions with hidden answers."""
+def difficulty(i, n):
+    if i < round(n * 0.4):
+        return "Easy"
+    if i < round(n * 0.75):
+        return "Medium"
+    return "Hard"
+
+
+def answer_inputs(pid, spec):
+    t = spec["t"]
+    if t in ("fields", "custom"):
+        rows = []
+        for k, f in enumerate(spec["f"]):
+            fid = f"{pid}-f{k}"
+            if f.get("opt"):
+                opts = '<option value="">choose</option>' + "".join(
+                    f'<option value="{html.escape(o)}">{html.escape(o)}</option>' for o in f["opt"])
+                ctl = f'<select id="{fid}" data-k="{k}">{opts}</select>'
+            else:
+                ctl = f'<input id="{fid}" data-k="{k}" type="text" autocomplete="off" spellcheck="false">'
+            rows.append(f'<div class="fld"><label for="{fid}">{html.escape(f["l"])}</label>{ctl}</div>')
+        return '<div class="fields">' + "".join(rows) + "</div>"
+    if t in ("choice", "multi"):
+        kind = "radio" if t == "choice" else "checkbox"
+        rows = "".join(
+            f'<label class="opt"><input type="{kind}" name="{pid}" value="{k}"><span>{html.escape(o)}</span></label>'
+            for k, o in enumerate(spec["o"]))
+        return f'<fieldset class="opts"><legend class="sr">Options</legend>{rows}</fieldset>'
+    if t == "order":
+        return (f'<div class="fields"><div class="fld wide"><label for="{pid}-f0">Your order</label>'
+                f'<input id="{pid}-f0" data-k="0" type="text" autocomplete="off" spellcheck="false" '
+                'placeholder="first, second, third, ..."></div></div>')
+    if t == "code":
+        return (f'<div class="editor code-ed"><pre class="gutter" aria-hidden="true">1</pre>'
+                f'<textarea data-indent="code" data-key="ans-{pid}" spellcheck="false" aria-label="Your code" '
+                'placeholder="Write your SystemVerilog here. Enter keeps the indent, Tab indents."></textarea></div>')
+    return (f'<div class="editor prose-ed"><textarea data-indent="notes" data-key="ans-{pid}" aria-label="Your answer" '
+            'placeholder="Write your answer in your own words."></textarea></div>')
+
+
+def build_practice(body, key):
+    """Turn the Practice and Answers lists into a LeetCode style problem set."""
     if "### Practice" not in body or "### Answers" not in body:
         return body
     head, rest = body.split("### Practice", 1)
@@ -208,23 +290,58 @@ def build_practice(body):
     if extra:
         target = next((i for i in range(len(ans) - 1, -1, -1) if "below" in " ".join(ans[i])), len(ans) - 1)
         ans[target] += extra
-    parts = ['<h3 id="practice">Practice</h3>',
-             '<p>Try each one first, then open the answer.</p>',
-             '<ol class="practice">']
-    for i, q in enumerate(qs):
-        a = ans[i] if i < len(ans) else ["(no answer written)"]
-        a_html = md("\n\n".join(a))
-        parts.append(
-            f"<li><div>{md_inline(' '.join(q))}</div>"
-            f'<details class="answer"><summary>Show answer</summary><div>{a_html}</div></details></li>'
+    specs = PROBLEMS[key]
+    if len(specs) != len(qs) or len(ans) != len(qs):
+        raise SystemExit(f"{key}: {len(qs)} questions, {len(ans)} answers, {len(specs)} problem specs")
+    n = len(qs)
+    rows, panels = [], []
+    for i, (q, a, (title, spec)) in enumerate(zip(qs, ans, specs)):
+        pid = f"p-{key}-{i + 1}"
+        diff = difficulty(i, n)
+        dcls = diff.lower()
+        rows.append(
+            f'<li><button type="button" class="prob-row" data-i="{i}" aria-controls="{pid}">'
+            f'<span class="pnum">{i + 1}.</span><span class="ptitle">{html.escape(title)}</span>'
+            f'<span class="diff {dcls}">{diff}</span><span class="pstat" aria-label="not solved yet"></span></button></li>'
         )
-    parts.append("</ol>")
-    return head + "\n\n" + "\n".join(parts) + "\n"
+        statement = md_inline(" ".join(q))
+        extra_q = spec.get("q", "")
+        if spec["t"] == "order":
+            extra_q = "Type the names in order, separated by commas."
+        if spec["t"] == "multi" and not extra_q:
+            extra_q = "Select every option that applies."
+        if spec["t"] in ("code", "explain"):
+            extra_q = "Write your answer, press Submit, then compare with the reference solution and mark it."
+        sol = md("\n\n".join(a)).replace('<details class="code">', '<details class="code" open>')
+        panels.append(
+            f'<div class="prob" id="{pid}" data-i="{i}" data-id="{pid}" '
+            f'data-check="{html.escape(json.dumps(spec), quote=True)}">'
+            f'<div class="prob-title"><h4>{i + 1}. {html.escape(title)}</h4><span class="diff {dcls}">{diff}</span></div>'
+            f'<div class="prob-statement"><p>{statement}</p>' + (f'<p class="hint">{extra_q}</p>' if extra_q else "") + "</div>"
+            + answer_inputs(pid, spec)
+            + '<div class="prob-actions"><button type="button" class="btn primary submit">Submit</button>'
+            '<button type="button" class="btn show-sol">Show solution</button></div>'
+            '<div class="verdict" role="status" aria-live="polite"></div>'
+            f'<div class="solution" hidden><div class="label">Solution</div>{sol}</div>'
+            '<div class="prob-nav"><button type="button" class="btn prev-p">Previous problem</button>'
+            '<button type="button" class="btn next-p">Next problem</button></div>'
+            "</div>"
+        )
+    html_out = (
+        f'<section class="problems" id="practice" data-lecture="{key}">'
+        f'<div class="prob-head"><h3>Problems</h3><span class="prob-progress">0 of {n} solved</span></div>'
+        '<p class="prob-intro">Pick a problem from the list. Short answers are checked for you. '
+        "For code and explanations, you compare with the reference and mark it yourself.</p>"
+        f'<ol class="prob-list">{"".join(rows)}</ol>'
+        f'<div class="prob-panels">{"".join(panels)}</div>'
+        "</section>"
+    )
+    return head + "\n\n" + html_out + "\n"
 
 
 def wrap_traps(body):
     return re.sub(
-        r"### Traps to watch for\n(.*?)(?=\n### |\n<h3 id=\"practice\">|\Z)",
+        r"### Traps to watch for\n(.*?)(?=\n### |\n<section class=\"problems\"|\Z)",
         lambda m: '<section class="traps" markdown="1">\n\n### Traps to watch for\n' + m.group(1) + "\n\n</section>\n",
         body,
         flags=re.S,
@@ -258,26 +375,29 @@ def build():
         gist = re.split(r"(?<=\.)\s", first_para)[0]
         meta.append({"key": key, "num": num, "name": name, "slug": SLUGS[key], "gist": gist, "sec": sec})
 
+    PAGE_LIST.clear()
+    PAGE_LIST.append(("index.html", "Home, all lectures"))
+    PAGE_LIST.extend((f'lectures/{m["slug"]}.html', f'{m["num"]}. {m["name"]}') for m in meta)
     out_dir = ROOT / "lectures"
     out_dir.mkdir(exist_ok=True)
     for i, m in enumerate(meta):
         store = []
         body = extract_code(m["sec"]["body"], m["key"], store)
         body = insert_figures(body, m["key"], store)
-        body = build_practice(body)
+        body = build_practice(body, m["key"])
         body = wrap_traps(body)
         content = md(body)
         content, steps = finish_html(content, store)
         content = content.replace("<p>", '<p class="lead">', 1)
         toc = "".join(f'<li><a href="#step-{n}">{html.escape(t)}</a></li>' for n, t in steps)
-        toc += '<li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li>'
+        toc += '<li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Problems</a></li>'
         head = (
             f'<h1><span class="kicker">{html.escape(m["num"])}</span>{html.escape(m["name"])}</h1>'
             f'<details class="toc"><summary>Steps in this lecture ({len(steps)})</summary><ol>{toc}</ol></details>'
         )
         prev_link = (f'{meta[i - 1]["slug"]}.html', f'{meta[i - 1]["num"]}. {meta[i - 1]["name"]}') if i > 0 else None
         next_link = (f'{meta[i + 1]["slug"]}.html', f'{meta[i + 1]["num"]}. {meta[i + 1]["name"]}') if i + 1 < len(meta) else None
-        html_page = page(f'{m["num"]}. {m["name"]} | EE 8350 Guide', head + content, 1, prev_link, next_link)
+        html_page = page(f'{m["num"]}. {m["name"]} | EE 8350 Guide', head + content, 1, m["slug"], prev_link, next_link)
         (out_dir / f'{m["slug"]}.html').write_text(html_page, encoding="utf-8")
 
     # Home page
@@ -288,7 +408,7 @@ def build():
     ib = ib.replace("### How each section is laid out", "### How each page is laid out")
     ib = ib.replace(
         "It ends with traps people fall into and practice problems that get harder as you go, with answers right after.",
-        "It ends with traps people fall into and practice problems that get harder as you go. Answers stay hidden until you open them.",
+        "It ends with traps people fall into and a set of problems that get harder as you go, checked in the page like LeetCode.",
     )
     ib += (
         "\n\nEvery code example has a pseudocode version in plain words first. "
@@ -309,7 +429,7 @@ def build():
         '<h2 id="orientation">Orientation</h2>'
         + intro_html
     )
-    (ROOT / "index.html").write_text(page("EE 8350 Guide", home, 0), encoding="utf-8")
+    (ROOT / "index.html").write_text(page("EE 8350 Guide", home, 0, "home"), encoding="utf-8")
     print(f"built index.html and {len(meta)} lecture pages")
 
 
