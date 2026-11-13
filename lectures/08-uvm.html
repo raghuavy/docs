@@ -32,7 +32,7 @@
 <div class="layout" id="layout">
 <div class="pane-main" id="paneMain">
 <main id="main">
-<h1><span class="kicker">Lecture 8</span>UVM</h1><details class="toc"><summary>Steps in this lecture (10)</summary><ol><li><a href="#step-1">The parts and what they do</a></li><li><a href="#step-2">Two family trees of classes</a></li><li><a href="#step-3">The factory and the macros</a></li><li><a href="#step-4">Phases</a></li><li><a href="#step-5">A component template</a></li><li><a href="#step-6">Transactions and sequences</a></li><li><a href="#step-7">Agent, environment and test</a></li><li><a href="#step-8">Objections, or how UVM knows when to stop</a></li><li><a href="#step-9">The top module and the configuration database</a></li><li><a href="#step-10">TLM connections</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Problems</a></li></ol></details><aside class="tryit"><div class="label">Try it yourself</div><p>Open the <a href="../playground.html">playground</a>, a VS Code with its own terminal, and type:</p><pre><code>./run 12-uvm-adder/adder_tb.sv</code></pre><p class="tryfiles">Code: <a href="https://github.com/raghuavy/docs/blob/main/playground/12-uvm-adder/adder_tb.sv">12-uvm-adder/adder_tb.sv</a>. Full UVM needs a commercial simulator, so this example is the same testbench in plain SystemVerilog.</p></aside><p class="lead">UVM, the Universal Verification Methodology, is a standard library of SystemVerilog base classes from the standards group Accellera. You extend its classes to build your testbench, so every UVM testbench has the same shape and parts can be reused.</p>
+<h1><span class="kicker">Lecture 8</span>UVM</h1><details class="toc"><summary>Steps in this lecture (10)</summary><ol><li><a href="#step-1">The parts and what they do</a></li><li><a href="#step-2">Two family trees of classes</a></li><li><a href="#step-3">The factory and the macros</a></li><li><a href="#step-4">Phases</a></li><li><a href="#step-5">A component template</a></li><li><a href="#step-6">Transactions and sequences</a></li><li><a href="#step-7">Agent, environment and test</a></li><li><a href="#step-8">Objections, or how UVM knows when to stop</a></li><li><a href="#step-9">The top module and the configuration database</a></li><li><a href="#step-10">TLM connections</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Problems</a></li></ol></details><aside class="tryit"><div class="label">Try it yourself</div><p class="run-row"><button type="button" class="btn primary run-here" data-starter="08-uvm">Run it in the side pane</button><span>This lecture's example runs right in this page, in the Code tab. Nothing to install.</span></p><p>For the full SystemVerilog version, with real constraints, covergroups and assertions, open the <a href="../playground.html">playground</a>, a VS Code with its own terminal, and type:</p><pre><code>./run 12-uvm-adder/adder_tb.sv</code></pre><p class="tryfiles">Code: <a href="https://github.com/raghuavy/docs/blob/main/playground/12-uvm-adder/adder_tb.sv">12-uvm-adder/adder_tb.sv</a>. Full UVM needs a commercial simulator, so this example is the same testbench in plain SystemVerilog.</p></aside><p class="lead">UVM, the Universal Verification Methodology, is a standard library of SystemVerilog base classes from the standards group Accellera. You extend its classes to build your testbench, so every UVM testbench has the same shape and parts can be reused.</p>
 <p>The layered testbench from Lecture 5 maps almost one to one onto UVM. UVM just gives each layer a standard class name and standard ways to connect.</p>
 <h3 id="step-1"><span class="stepno">Step 1</span>The parts and what they do</h3>
 <ol>
@@ -249,6 +249,7 @@ endfunction</code></pre></details></div></div><div class="prob-nav"><button type
     <div class="seg" role="tablist" aria-label="Side pane shows">
       <button type="button" role="tab" data-mode="notes" aria-selected="true">Notes</button>
       <button type="button" role="tab" data-mode="page" aria-selected="false">Another page</button>
+      <button type="button" role="tab" data-mode="code" aria-selected="false">Code</button>
     </div>
     <button type="button" class="side-close">Close</button>
   </div>
@@ -263,6 +264,35 @@ endfunction</code></pre></details></div></div><div class="prob-nav"><button type
   <section class="side-page" data-panel="page" hidden>
     <label class="side-pick">Show <select id="pagePick"><option value="../index.html">Home, all lectures</option><option value="../playground.html">Playground</option><option value="../lectures/01-systemverilog-review.html">Lecture 1. SystemVerilog Review</option><option value="../lectures/02-oop.html">Lecture 2. OOP in SystemVerilog</option><option value="../lectures/03-randomization.html">Lecture 3. Randomization</option><option value="../lectures/04-coverage-basics.html">Lecture 4. Functional Coverage Basics</option><option value="../lectures/05-interfaces.html">Lecture 5. The Interface Construct</option><option value="../lectures/06-07-threads.html">Lectures 6 and 7. Threads and Interprocess Communication</option><option value="../lectures/08-uvm.html">Lecture 8. UVM</option><option value="../lectures/09-11-advanced-oop.html">Lectures 9 to 11. Advanced OOP and Testbench Guidelines</option><option value="../lectures/10-assertions-basics.html">Lecture 10. Assertions Basics</option><option value="../lectures/12-uvm-adder.html">Lecture 12. UVM Adder Example</option><option value="../lectures/12-advanced-interfaces.html">Lecture 12. Advanced Interfaces</option><option value="../lectures/13-14-coverage-in-depth.html">Lectures 13 and 14. Functional Coverage in Depth</option><option value="../lectures/14-16-advanced-assertions.html">Lectures 14 to 16. Advanced Assertions</option><option value="../lectures/16-18-sva.html">Lectures 16 to 18. SVA</option><option value="../lectures/19-clock-domain-crossing.html">Lecture 19. Clock Domain Crossing</option></select></label>
     <iframe id="sideFrame" title="Another page of the guide"></iframe>
+  </section>
+  <section class="side-code" data-panel="code" hidden data-page="08-uvm" data-starter="08-uvm"
+    data-js="../assets/sim/pane.js" data-starters="../assets/sim/starters.js" data-worker="../assets/sim/worker.js">
+    <div class="code-bar">
+      <button type="button" class="btn primary code-run" title="Ctrl+Enter">Run</button>
+      <button type="button" class="btn code-stop" hidden>Stop</button>
+      <label class="code-flags">Flags <input type="text" class="code-flag-in" spellcheck="false" autocomplete="off" placeholder="-D BUG  +n=5"></label>
+    </div>
+    <div class="code-bar code-bar2">
+      <label class="code-pick">Example <select class="code-pick-in"></select></label>
+      <span class="tool-btns"><button type="button" class="code-reset">Reset</button><button type="button" class="code-dl">Download</button><button type="button" class="code-eda">Copy for EDA Playground</button></span>
+    </div>
+    <div class="editor code-ed side-ed"><pre class="gutter" aria-hidden="true"></pre><textarea class="code-src" data-indent="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="SystemVerilog code"></textarea></div>
+    <div class="code-out-bar">
+      <div class="seg out-seg" role="tablist" aria-label="Results">
+        <button type="button" role="tab" data-out="console" aria-selected="true">Output</button>
+        <button type="button" role="tab" data-out="waves" aria-selected="false" disabled>Waves</button>
+      </div>
+      <span class="code-status" aria-live="polite">Loading</span>
+    </div>
+    <pre class="console" tabindex="0" aria-label="Simulator output"></pre>
+    <div class="waves" hidden></div>
+    <details class="code-limits"><summary>What runs here, and what does not</summary>
+      <p>This tab runs <strong>Icarus Verilog</strong> inside your browser. Your code never leaves this computer, and it is saved in this browser per example.</p>
+      <p><strong>Works:</strong> modules, always blocks, tasks and functions, fork and join, events, queues, enums, packed structs, strings, simple classes, immediate <code>assert</code>, <code>$urandom</code>, <code>`ifdef</code> with <code>-D</code> flags, <code>+plusargs</code>, and <code>$dumpvars</code> for the Waves view.</p>
+      <p><strong>Not supported:</strong> <code>randomize()</code> and constraints, covergroups, <code>assert property</code> and sequences, mailbox and semaphore, interfaces as ports, modports, clocking blocks, virtual interfaces, UVM.</p>
+      <p><strong>Wrong answers to watch for:</strong> a virtual method called through a parent handle runs the parent version, <code>$onehot0</code> and <code>$countones</code> on an expression return wrong values, and <code>automatic</code> variables inside a fork are not supported.</p>
+      <p>For all of those, use the <a href="../playground.html">Codespace playground</a> (Verilator, with real constraints, covergroups and assertions), or <a href="https://www.edaplayground.com/" target="_blank" rel="noopener">EDA Playground</a> (commercial simulators with UVM, free account).</p>
+    </details>
   </section>
 </aside>
 </div>

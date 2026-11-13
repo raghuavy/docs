@@ -37,6 +37,8 @@ The top module in each file must be called `tb`. Put your own experiments in `sc
 11. `12-uvm-adder/adder_tb.sv` is the adder with a predictor and scoreboard in plain SystemVerilog. Run it again with `-D BUG`.
 12. `19-cdc/sync.sv` has two clocks, a two flop synchronizer and a Gray code counter with an assertion. Try `--wave`.
 
+The `browser/` folder holds a second set of examples, one per lecture, written for the website's Code tab. That tab runs Icarus Verilog inside the browser, so these stick to what Icarus supports and build things like constraints, coverage and assertion checks by hand.
+
 ## What the free tools cannot do
 
 The playground uses Verilator 5.054 and Icarus Verilog 13. They handle classes, constraints, covergroups, threads, mailboxes and most assertions. Some things they do not cover:
