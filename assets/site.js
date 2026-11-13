@@ -56,16 +56,49 @@
     if (frame.getAttribute("src") !== pick.value) frame.setAttribute("src", pick.value);
   }
   function setMode(m) {
+    if (m === "code" && !codeSec) m = "notes";
     tabs.forEach(function (t) { t.setAttribute("aria-selected", String(t.getAttribute("data-mode") === m)); });
     panels.forEach(function (p) { p.hidden = p.getAttribute("data-panel") !== m; });
     store.set("ee8350-sidemode", m);
     if (m === "page") loadFrame();
+    if (m === "code") withCode(function (c) { c.open(); });
   }
+
+  // ---------- Code tab: its script loads the first time the tab opens ----------
+  var codeSec = document.querySelector(".side-code");
+  var codeQueue = [], codeLoading = false;
+  function withCode(cb) {
+    if (!codeSec) return;
+    if (window.EECode) { cb(window.EECode); return; }
+    codeQueue.push(cb);
+    if (codeLoading) return;
+    codeLoading = true;
+    var sc = document.createElement("script");
+    sc.src = codeSec.getAttribute("data-js");
+    sc.onload = function () { var q = codeQueue; codeQueue = []; q.forEach(function (f) { if (window.EECode) f(window.EECode); }); };
+    sc.onerror = function () {
+      codeLoading = false;
+      var st = codeSec.querySelector(".code-status");
+      if (st) st.textContent = "Could not load the Code tab. Check the connection and open the tab again.";
+    };
+    document.head.appendChild(sc);
+  }
+  function runHere(id) {
+    if (embedded) { try { window.parent.EE.runHere(id); } catch (e) {} return; }
+    if (!codeSec) return;
+    setSplit(true, true);
+    setMode("code");
+    withCode(function (c) { c.load(id, true); });
+  }
+  document.querySelectorAll(".run-here").forEach(function (b) {
+    b.addEventListener("click", function () { runHere(b.getAttribute("data-starter")); });
+  });
   function setSplit(on, save) {
     d.classList.toggle("split", on);
     if (splitBtn) splitBtn.setAttribute("aria-pressed", String(on));
     if (save) store.set("ee8350-split", on ? "on" : "off");
     if (on && store.get("ee8350-sidemode") === "page") loadFrame();
+    if (on && store.get("ee8350-sidemode") === "code") withCode(function (c) { c.open(); });
   }
 
   if (!embedded && splitBtn) {
@@ -223,6 +256,7 @@
       ta.addEventListener("input", function () { clearTimeout(t2); t2 = setTimeout(function () { store.set("ee8350-" + key, ta.value); }, 400); });
     }
     if (gutter) { ta.addEventListener("input", renumber); ta.addEventListener("scroll", function () { gutter.scrollTop = ta.scrollTop; }); renumber(); }
+    ta._renumber = renumber;
 
     ta.addEventListener("keydown", function (e) {
       if (e.key === "Escape") { ta._esc = true; return; }
@@ -293,6 +327,7 @@
     }
   }
   document.querySelectorAll("textarea[data-indent]").forEach(attachEditor);
+  window.EE = { store: store, insertText: insertText, runHere: runHere };
 
   // ---------- Copy buttons on code ----------
   document.querySelectorAll("details.code, .tryit, .cmd, main > pre").forEach(function (box) {

@@ -82,10 +82,24 @@ def try_box(key):
             if key in UVM_NOTE else "")
     return (
         '<aside class="tryit"><div class="label">Try it yourself</div>'
-        f'<p>Open the <a href="../playground.html">playground</a>, a VS Code with its own terminal, and type{"" if len(TRY[key]) == 1 else " any of"}:</p>'
+        f'<p class="run-row"><button type="button" class="btn primary run-here" data-starter="{SLUGS[key]}">Run it in the side pane</button>'
+        '<span>This lecture\'s example runs right in this page, in the Code tab. Nothing to install.</span></p>'
+        f'<p>For the full SystemVerilog version, with real constraints, covergroups and assertions, open the '
+        f'<a href="../playground.html">playground</a>, a VS Code with its own terminal, and type{"" if len(TRY[key]) == 1 else " any of"}:</p>'
         f"<pre><code>{html.escape(cmds)}</code></pre>"
         f'<p class="tryfiles">Code: {links}.{note}</p></aside>'
     )
+
+
+def write_starters(meta):
+    """Bundle the Code tab's examples from playground/browser into assets/sim/starters.js."""
+    src = ROOT / "playground" / "browser"
+    items = [{"id": "hello", "label": "Hello: a counter with waves", "file": "hello.sv"}]
+    items += [{"id": m["slug"], "label": f'{m["num"]}. {m["name"]}', "file": f'{m["slug"]}.sv'} for m in meta]
+    for it in items:
+        it["code"] = (src / it["file"]).read_text(encoding="utf-8")
+    js = "// Built by _src/build.py from playground/browser/*.sv. Do not edit by hand.\nwindow.EE_STARTERS = " + json.dumps(items, indent=1) + ";\n"
+    (ROOT / "assets" / "sim" / "starters.js").write_text(js, encoding="utf-8")
 
 
 def md(text):
@@ -107,7 +121,7 @@ def code_html(code):
 PAGE_LIST = []  # (root relative path, label), filled in build()
 
 
-def page(title, body, depth, note_key, prev_link=None, next_link=None):
+def page(title, body, depth, note_key, prev_link=None, next_link=None, starter="hello"):
     up = "../" * depth
     pager = ""
     if prev_link or next_link:
@@ -167,6 +181,7 @@ def page(title, body, depth, note_key, prev_link=None, next_link=None):
     <div class="seg" role="tablist" aria-label="Side pane shows">
       <button type="button" role="tab" data-mode="notes" aria-selected="true">Notes</button>
       <button type="button" role="tab" data-mode="page" aria-selected="false">Another page</button>
+      <button type="button" role="tab" data-mode="code" aria-selected="false">Code</button>
     </div>
     <button type="button" class="side-close">Close</button>
   </div>
@@ -181,6 +196,35 @@ def page(title, body, depth, note_key, prev_link=None, next_link=None):
   <section class="side-page" data-panel="page" hidden>
     <label class="side-pick">Show <select id="pagePick">{options}</select></label>
     <iframe id="sideFrame" title="Another page of the guide"></iframe>
+  </section>
+  <section class="side-code" data-panel="code" hidden data-page="{note_key}" data-starter="{starter}"
+    data-js="{up}assets/sim/pane.js" data-starters="{up}assets/sim/starters.js" data-worker="{up}assets/sim/worker.js">
+    <div class="code-bar">
+      <button type="button" class="btn primary code-run" title="Ctrl+Enter">Run</button>
+      <button type="button" class="btn code-stop" hidden>Stop</button>
+      <label class="code-flags">Flags <input type="text" class="code-flag-in" spellcheck="false" autocomplete="off" placeholder="-D BUG  +n=5"></label>
+    </div>
+    <div class="code-bar code-bar2">
+      <label class="code-pick">Example <select class="code-pick-in"></select></label>
+      <span class="tool-btns"><button type="button" class="code-reset">Reset</button><button type="button" class="code-dl">Download</button><button type="button" class="code-eda">Copy for EDA Playground</button></span>
+    </div>
+    <div class="editor code-ed side-ed"><pre class="gutter" aria-hidden="true"></pre><textarea class="code-src" data-indent="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="SystemVerilog code"></textarea></div>
+    <div class="code-out-bar">
+      <div class="seg out-seg" role="tablist" aria-label="Results">
+        <button type="button" role="tab" data-out="console" aria-selected="true">Output</button>
+        <button type="button" role="tab" data-out="waves" aria-selected="false" disabled>Waves</button>
+      </div>
+      <span class="code-status" aria-live="polite">Loading</span>
+    </div>
+    <pre class="console" tabindex="0" aria-label="Simulator output"></pre>
+    <div class="waves" hidden></div>
+    <details class="code-limits"><summary>What runs here, and what does not</summary>
+      <p>This tab runs <strong>Icarus Verilog</strong> inside your browser. Your code never leaves this computer, and it is saved in this browser per example.</p>
+      <p><strong>Works:</strong> modules, always blocks, tasks and functions, fork and join, events, queues, enums, packed structs, strings, simple classes, immediate <code>assert</code>, <code>$urandom</code>, <code>`ifdef</code> with <code>-D</code> flags, <code>+plusargs</code>, and <code>$dumpvars</code> for the Waves view.</p>
+      <p><strong>Not supported:</strong> <code>randomize()</code> and constraints, covergroups, <code>assert property</code> and sequences, mailbox and semaphore, interfaces as ports, modports, clocking blocks, virtual interfaces, UVM.</p>
+      <p><strong>Wrong answers to watch for:</strong> a virtual method called through a parent handle runs the parent version, <code>$onehot0</code> and <code>$countones</code> on an expression return wrong values, and <code>automatic</code> variables inside a fork are not supported.</p>
+      <p>For all of those, use the <a href="{up}playground.html">Codespace playground</a> (Verilator, with real constraints, covergroups and assertions), or <a href="https://www.edaplayground.com/" target="_blank" rel="noopener">EDA Playground</a> (commercial simulators with UVM, free account).</p>
+    </details>
   </section>
 </aside>
 </div>
@@ -441,8 +485,10 @@ def build():
         )
         prev_link = (f'{meta[i - 1]["slug"]}.html', f'{meta[i - 1]["num"]}. {meta[i - 1]["name"]}') if i > 0 else None
         next_link = (f'{meta[i + 1]["slug"]}.html', f'{meta[i + 1]["num"]}. {meta[i + 1]["name"]}') if i + 1 < len(meta) else None
-        html_page = page(f'{m["num"]}. {m["name"]} | EE 8350 Guide', head + content, 1, m["slug"], prev_link, next_link)
+        html_page = page(f'{m["num"]}. {m["name"]} | EE 8350 Guide', head + content, 1, m["slug"], prev_link, next_link, starter=m["slug"])
         (out_dir / f'{m["slug"]}.html').write_text(html_page, encoding="utf-8")
+
+    write_starters(meta)
 
     # Home page
     store = []
@@ -481,8 +527,16 @@ def build():
     readme = re.sub(r"`([0-9][^`]*?\.sv)`", lambda m: f'[`{m.group(1)}`]({REPO_URL}{m.group(1)})', readme)
     pg_body = (
         '<h1><span class="kicker">EE 8350</span>Playground</h1>'
-        '<p class="lead">Your own VS Code in the browser, with a terminal and the simulators already installed. '
-        "Run the course examples, change them, and write your own.</p>"
+        '<p class="lead">Somewhere to try the code. '
+        "Two ways to run the course examples, change them, and write your own.</p>"
+        '<h2 id="in-page">Quickest: the Code tab</h2>'
+        '<p>Every page has a Code tab in its side pane. It runs Icarus Verilog right in your browser, with an editor, '
+        'output like a terminal, and a waveform view. Each lecture starts you on its own example.</p>'
+        '<p class="run-row"><button type="button" class="btn primary run-here" data-starter="hello">Open the Code tab</button>'
+        '<span>Good for RTL, timing, threads and simple testbenches. No setup.</span></p>'
+        '<h2 id="codespace">Full toolchain: the Codespace</h2>'
+        '<p>For constraints, covergroups and concurrent assertions you need Verilator, which runs in a Codespace: '
+        'a VS Code in the browser with its own terminal.</p>'
         f'<p><a class="bigbtn" href="{CODESPACE_URL}">Open the playground in GitHub Codespaces</a></p>'
         + md(readme)
     )
