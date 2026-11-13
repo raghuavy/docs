@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 2. OOP in SystemVerilog | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lecture 2</span>OOP in SystemVerilog</h1><details class="toc"><summary>Steps in this lecture (9)</summary><ol><li><a href="#step-1">The vocabulary</a></li><li><a href="#step-2">Why bother with OOP</a></li><li><a href="#step-3">Declare, construct and use</a></li><li><a href="#step-4">Inheritance with extends and super</a></li><li><a href="#step-5">Static variables</a></li><li><a href="#step-6">The keyword this</a></li><li><a href="#step-7">Nested classes and extern methods</a></li><li><a href="#step-8">Arrays of handles</a></li><li><a href="#step-9">Three levels of copying</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">A class bundles data together with the code that works on that data. Testbenches use classes because a transaction (one packet, one bus read) is naturally a bundle of fields plus helper methods.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>The vocabulary</h3>
+<ul>
+<li>A class is the blueprint. Think of it as the plans for a building.</li>
+<li>An object is one thing built from the blueprint. You can build many objects from one class.</li>
+<li>A property (also called an attribute) is a variable inside the class.</li>
+<li>A method is a function or task inside the class.</li>
+<li>A constructor is the method that builds an object. In SystemVerilog it is always called new.</li>
+<li>A handle is a pointer to an object. A variable of class type holds a handle, not the object itself.</li>
+</ul>
+<figure class="fig"><svg viewBox="0 0 760 310" role="img" aria-label="One class, objects built with new, handles pointing at objects"><text x="120" y="30" font-size="16" text-anchor="middle" class="tm">class</text><text x="400" y="30" font-size="16" text-anchor="middle" class="tm">objects</text><text x="635" y="30" font-size="16" text-anchor="middle" class="tm">handles</text><rect x="20" y="95" width="200" height="100" rx="10" class="bxq"/><text x="120.0" y="141.2" font-size="19" text-anchor="middle" font-weight="700">class simple</text><text x="120.0" y="162.1" font-size="16" text-anchor="middle" class="tm">the blueprint</text><rect x="310" y="40" width="180" height="64" rx="10" class="bx"/><text x="400.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">object 1</text><rect x="310" y="160" width="180" height="64" rx="10" class="bx"/><text x="400.0" y="198.7" font-size="19" text-anchor="middle" font-weight="700">object 2</text><path d="M220 145H265V72H310" class="ln" marker-end="url(#ah)"/><path d="M265 145V192H310" class="ln" marker-end="url(#ah)"/><text x="258" y="64" font-size="16" text-anchor="end" class="tm">new()</text><rect x="590" y="50" width="90" height="44" rx="10" class="bxa"/><text x="635.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">s</text><rect x="590" y="170" width="90" height="44" rx="10" class="bxa"/><text x="635.0" y="198.7" font-size="19" text-anchor="middle" font-weight="700">t</text><rect x="590" y="250" width="90" height="44" rx="10" class="bxa"/><text x="635.0" y="278.6" font-size="19" text-anchor="middle" font-weight="700">u</text><path d="M590 72H490" class="ln" marker-end="url(#ah)"/><path d="M590 192H490" class="ln" marker-end="url(#ah)"/><text x="694" y="278" font-size="17" text-anchor="start" class="tm">null</text></svg><figcaption>The class is only a plan. new() builds objects from it. A handle points at one object, and a handle you never assigned holds null.</figcaption></figure>
+<h3 id="step-2"><span class="stepno">Step 2</span>Why bother with OOP</h3>
+<ol>
+<li>Encapsulation means hiding data. Members can be public (the default), local (only this class) or protected (this class and its children).</li>
+<li>Abstraction means hiding complexity behind a simple interface.</li>
+<li>Inheritance means a child class reuses and extends a parent class.</li>
+<li>Polymorphism means a parent handle can point to a child object and call the child's version of a method. Lecture 9 to 11 goes deep on this.</li>
+</ol>
+<h3 id="step-3"><span class="stepno">Step 3</span>Declare, construct and use</h3>
+<p>The slide class has three properties and two methods.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>blueprint &quot;simple&quot; holds address, data and check, 16 bits each
+
+    set_check:  check = address XOR data
+    print:      show all three in hex</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class simple;
+  bit [15:0] address, data, check;
+
+  function void set_check();
+    check = address ^ data;
+  endfunction
+
+  function void print();
+    $display(&quot;address is %h, data is %h, check is %h&quot;, address, data, check);
+  endfunction
+endclass</code></pre></details></div>
+<p>Declaring a handle does not build anything. The handle starts as null, and new() builds the object.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>s is a handle that points at nothing yet (null)
+build an object and point s at it
+set address to abcd and data to 1234
+compute the check value       -&gt;  b9f9
+print everything
+
+t: declare a handle and build its object in one line</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>simple s;          <span class="c">// handle only, s is null</span>
+s = new();         <span class="c">// now an object exists</span>
+s.address = 16&#x27;habcd;
+s.data    = 16&#x27;h1234;
+s.set_check();
+s.print();         <span class="c">// address is abcd, data is 1234, check is b9f9</span>
+
+simple t = new();  <span class="c">// declare and construct in one line</span></code></pre></details></div>
+<p>The dot works like it does for a struct, but it reaches methods too.</p>
+<h3 id="step-4"><span class="stepno">Step 4</span>Inheritance with extends and super</h3>
+<p>A child class is made with extends. It automatically has every property and method of its parent. The parent is also called the superclass or base class, and the child is the subclass or derived class.</p>
+<p>When the child defines a method with the same name as the parent's, the child's version wins. The keyword super reaches back to the parent's version.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>base class:
+    show(): print &quot;BASE&quot; and the time
+
+extd, a child of base:
+    show(): print &quot;EXTD&quot; and the time
+            then also run the parent&#x27;s show()</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class base;
+  task show();
+    $display(&quot;BASE task at %0t&quot;, $time);
+  endtask
+endclass
+
+class extd extends base;
+  task show();
+    $display(&quot;EXTD task at %0t&quot;, $time);
+    super.show();   <span class="c">// also run the parent&#x27;s version</span>
+  endtask
+endclass</code></pre></details></div>
+<p>Calling show() on an extd object at time 10 prints the EXTD line, then the BASE line, both at time 10. That matches the slide output.</p>
+<h3 id="step-5"><span class="stepno">Step 5</span>Static variables</h3>
+<p>A normal property belongs to one object. A static property belongs to the class, so all objects share one copy. If any object changes it, every object sees the new value.</p>
+<p>You can reach a static property through any handle, or through the class name with ::.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>every counter object shares ONE count, starting at 0
+building an object adds 1 to that shared count
+
+build c1, build c2
+print counter::count          -&gt;  2</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class counter;
+  static int count = 0;
+  function new(); count++; endfunction
+endclass
+
+counter c1 = new(), c2 = new();
+initial $display(counter::count);   <span class="c">// 2</span></code></pre></details></div>
+<h3 id="step-6"><span class="stepno">Step 6</span>The keyword this</h3>
+<p>When a function argument has the same name as a property, the plain name means the argument. Writing this.x means the property instead.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>class demo has its own x
+
+set(x) receives an argument that is also called x:
+    this.x   (the object&#x27;s x)   =   x   (the argument)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class demo;
+  int x;
+  function void set(int x);
+    this.x = x;   <span class="c">// property gets the argument</span>
+  endfunction
+endclass</code></pre></details></div>
+<h3 id="step-7"><span class="stepno">Step 7</span>Nested classes and extern methods</h3>
+<p>A class declared inside another class is a nested class. Only the outer class uses it, which keeps its name from colliding with other code.</p>
+<p>The extern keyword lets you declare a method in the class and write its body outside. The class body then fits on one screen, which makes big classes easier to read.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>inside the class: promise a task called report
+
+outside the class, write its body:
+    print the current time</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class ext_demo;
+  extern task report();
+endclass
+
+task ext_demo::report();
+  $display(&quot;The externally declared task has been called at time %0t&quot;, $time);
+endtask</code></pre></details></div>
+<h3 id="step-8"><span class="stepno">Step 8</span>Arrays of handles</h3>
+<p>An array of class type holds handles, not objects. You must call new for each element, usually in a loop. Two elements may point to the same object, and an element you never constructed is null.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>arr holds 5 handles, all empty at first
+
+for each slot:
+    build a new object and store its handle there</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>ext_demo arr [5];
+initial foreach (arr[i]) arr[i] = new();</code></pre></details></div>
+<h3 id="step-9"><span class="stepno">Step 9</span>Three levels of copying</h3>
+<ol>
+<li>Copy the handle. <code>a2 = a1;</code> makes two handles to one object. Changing a2.x changes what a1.x reads.</li>
+<li>Shallow copy. <code>a2 = new a1;</code> builds a second object with copies of every property. Any handle inside, though, is copied as a handle, so both objects still share the inner object.</li>
+<li>Deep copy. You write your own copy method that also builds new inner objects. Nothing is shared afterward.</li>
+</ol>
+<figure class="fig"><svg viewBox="0 0 760 320" role="img" aria-label="Handle copy, shallow copy and deep copy"><text x="130" y="26" font-size="18" text-anchor="middle" font-weight="700">Copy the handle</text><rect x="30" y="48" width="80" height="40" rx="10" class="bxa"/><text x="70.0" y="74.7" font-size="19" text-anchor="middle" font-weight="700">a1</text><rect x="150" y="48" width="80" height="40" rx="10" class="bxa"/><text x="190.0" y="74.7" font-size="19" text-anchor="middle" font-weight="700">a2</text><rect x="60" y="140" width="140" height="56" rx="10" class="bx"/><text x="130.0" y="174.7" font-size="19" text-anchor="middle" font-weight="700">object</text><path d="M70 88V140" class="ln" marker-end="url(#ah)"/><path d="M190 88V140" class="ln" marker-end="url(#ah)"/><rect x="60" y="250" width="140" height="56" rx="10" class="bx"/><text x="130.0" y="284.6" font-size="19" text-anchor="middle" font-weight="700">inner</text><path d="M130 196V250" class="ln" marker-end="url(#ah)"/><text x="390" y="26" font-size="18" text-anchor="middle" font-weight="700">Shallow copy</text><rect x="290" y="48" width="80" height="40" rx="10" class="bxa"/><text x="330.0" y="74.7" font-size="19" text-anchor="middle" font-weight="700">a1</text><rect x="410" y="48" width="80" height="40" rx="10" class="bxa"/><text x="450.0" y="74.7" font-size="19" text-anchor="middle" font-weight="700">a2</text><rect x="280" y="140" width="100" height="56" rx="10" class="bx"/><text x="330.0" y="174.7" font-size="19" text-anchor="middle" font-weight="700">object</text><rect x="400" y="140" width="100" height="56" rx="10" class="bx"/><text x="450.0" y="174.7" font-size="19" text-anchor="middle" font-weight="700">object</text><path d="M330 88V140" class="ln" marker-end="url(#ah)"/><path d="M450 88V140" class="ln" marker-end="url(#ah)"/><rect x="320" y="250" width="140" height="56" rx="10" class="bxw"/><text x="390.0" y="274.2" font-size="19" text-anchor="middle" font-weight="700">inner</text><text x="390.0" y="295.1" font-size="16" text-anchor="middle" class="tm">shared</text><path d="M340 196V250" class="ln" marker-end="url(#ah)"/><path d="M440 196V250" class="ln" marker-end="url(#ah)"/><text x="650" y="26" font-size="18" text-anchor="middle" font-weight="700">Deep copy</text><rect x="550" y="48" width="80" height="40" rx="10" class="bxa"/><text x="590.0" y="74.7" font-size="19" text-anchor="middle" font-weight="700">a1</text><rect x="670" y="48" width="80" height="40" rx="10" class="bxa"/><text x="710.0" y="74.7" font-size="19" text-anchor="middle" font-weight="700">a2</text><rect x="540" y="140" width="100" height="56" rx="10" class="bx"/><text x="590.0" y="174.7" font-size="19" text-anchor="middle" font-weight="700">object</text><rect x="660" y="140" width="100" height="56" rx="10" class="bx"/><text x="710.0" y="174.7" font-size="19" text-anchor="middle" font-weight="700">object</text><path d="M590 88V140" class="ln" marker-end="url(#ah)"/><path d="M710 88V140" class="ln" marker-end="url(#ah)"/><rect x="540" y="250" width="100" height="56" rx="10" class="bx"/><text x="590.0" y="284.6" font-size="19" text-anchor="middle" font-weight="700">inner</text><rect x="660" y="250" width="100" height="56" rx="10" class="bx"/><text x="710.0" y="284.6" font-size="19" text-anchor="middle" font-weight="700">inner</text><path d="M590 196V250" class="ln" marker-end="url(#ah)"/><path d="M710 196V250" class="ln" marker-end="url(#ah)"/><path d="M260 20V310M520 20V310" class="grid"/></svg><figcaption>Left: two handles, one object. Middle: new a1 makes a second object, but objects inside are still shared. Right: a copy method you write rebuilds the inner objects too.</figcaption></figure>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>inner holds a number x
+outer holds a handle org, pointing to its own inner object
+
+copy():
+    build a brand new outer   (it gets a brand new inner too)
+    copy the number x into that new inner
+    give back the new outer
+
+make dup1 and set its x to 8
+dup2 = dup1.copy()
+change dup1&#x27;s x to 6
+print both                    -&gt;  6 and 8, nothing is shared</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class inner; int x; endclass
+
+class outer;
+  inner org = new();
+  function outer copy();
+    copy = new();
+    copy.org.x = this.org.x;   <span class="c">// fresh inner object, same value</span>
+  endfunction
+endclass
+
+outer dup1 = new(), dup2;
+initial begin
+  dup1.org.x = 8;
+  dup2 = dup1.copy();
+  dup1.org.x = 6;
+  $display(dup1.org.x, dup2.org.x);   <span class="c">// 6 and 8</span>
+end</code></pre></details></div>
+<p>The slide output matches this. Both print 8 after the copy, then dup1 changes to 6 while dup2 stays 8.</p>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Using a handle before new() crashes the simulation with a null handle error.</li>
+<li><code>a2 = a1;</code> does not copy an object. It copies the pointer.</li>
+<li>A shallow copy shares every object nested inside.</li>
+<li>A child method with the same name hides the parent's method unless you call super.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>In one sentence each, what is the difference between a class, an object and a handle?</div><details class="answer"><summary>Show answer</summary><div><p>A class is the type, an object is one built instance of it, and a handle is the variable that points at an object.</p></div></details></li>
+<li><div>What happens when this runs? <code>simple s; s.data = 5;</code></div><details class="answer"><summary>Show answer</summary><div><p>A runtime null handle error, because no object was built.</p></div></details></li>
+<li><div>A class has <code>static int count;</code> and its new() does count++. After three objects are built, what does count read through the first object?</div><details class="answer"><summary>Show answer</summary><div><ol start="3">
+<li>Every object shares the one static count.</li>
+</ol></div></details></li>
+<li><div>Class A has <code>int x;</code>. You run <code>a1.x = 8; a2 = a1; a2.x = 6;</code>. What does a1.x read?</div><details class="answer"><summary>Show answer</summary><div><ol start="6">
+<li>Both handles point at one object.</li>
+</ol></div></details></li>
+<li><div>Same class, but now <code>a2 = new a1;</code> before <code>a2.x = 6;</code>. What does a1.x read?</div><details class="answer"><summary>Show answer</summary><div><ol start="8">
+<li>new a1 built a separate object.</li>
+</ol></div></details></li>
+<li><div>Class A also holds a handle b to class B, which has <code>int y;</code>. After <code>a2 = new a1; a2.b.y = 9;</code>, what does a1.b.y read and why?</div><details class="answer"><summary>Show answer</summary><div><ol start="9">
+<li>The shallow copy copied the handle b, so both objects share the same B.</li>
+</ol></div></details></li>
+<li><div>Write a deep copy method for class A from problem 6.</div><details class="answer"><summary>Show answer</summary><div><p>One version is below.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>copy():
+    build a new A
+    copy x across
+    build a new B for it
+    copy y across
+    give back the new A</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>function A copy();
+  copy = new();
+  copy.x = x;
+  copy.b = new();
+  copy.b.y = b.y;
+endfunction</code></pre></details></div></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="01-systemverilog-review.html"><span class="dir">Previous</span>Lecture 1. SystemVerilog Review</a><a class="next" href="03-randomization.html"><span class="dir">Next</span>Lecture 3. Randomization</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

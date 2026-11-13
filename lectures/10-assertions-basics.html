@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 10. Assertions Basics | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lecture 10</span>Assertions Basics</h1><details class="toc"><summary>Steps in this lecture (7)</summary><ol><li><a href="#step-1">Three ways to verify</a></li><li><a href="#step-2">What an assertion says</a></li><li><a href="#step-3">Why not just write if statements</a></li><li><a href="#step-4">Assertions are formal</a></li><li><a href="#step-5">Where assertions go</a></li><li><a href="#step-6">Immediate assertions</a></li><li><a href="#step-7">Why assertions pay off</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">An assertion is a statement of something that must always be true about the design. If it ever turns out false, the simulator reports an error at that exact time and place. SVA, SystemVerilog Assertions, is the part of the language for writing them. The reference is Cerny et al., SVA, The Power of Assertions in SystemVerilog.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Three ways to verify</h3>
+<ol>
+<li>Directed tests apply inputs you chose by hand.</li>
+<li>Constrained random verification lets the simulator choose inputs inside rules.</li>
+<li>Assertions watch the design all the time and complain the moment a rule breaks.</li>
+</ol>
+<p>They work together. Random tests create activity, and assertions check that activity everywhere.</p>
+<h3 id="step-2"><span class="stepno">Step 2</span>What an assertion says</h3>
+<p>A property is a rule about signal values, either at one moment or across several clock cycles. Two examples from the slides follow.</p>
+<ul>
+<li>Two signals should never both be 1 at the same time.</li>
+<li>A signal should be 1 three clock cycles after another signal was 1.</li>
+</ul>
+<p>The simulator checks each assertion every clock cycle. On a failure it prints the time, the assertion's name and the values involved.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>at every rising clk:
+    a must be different from b</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>a1: assert property (@(posedge clk) a != b);</code></pre></details></div>
+<p>Read it as, at every rising clock edge, a must differ from b. The a1 in front is a label that appears in error messages.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>Why not just write if statements</h3>
+<p>Take the rule that grant must be high exactly 4 cycles after req goes high. The Verilog way uses a counter.</p>
+<figure class="fig"><svg viewBox="0 0 760 305" role="img" aria-label="Two overlapping requests, each with its own check"><path d="M130 30V296" class="grid dash"/><path d="M200 30V296" class="grid dash"/><path d="M270 30V296" class="grid dash"/><path d="M340 30V296" class="grid dash"/><path d="M410 30V296" class="grid dash"/><path d="M480 30V296" class="grid dash"/><path d="M550 30V296" class="grid dash"/><path d="M620 30V296" class="grid dash"/><path d="M690 30V296" class="grid dash"/><text x="130" y="24" font-size="14" text-anchor="middle" class="tm">0</text><text x="200" y="24" font-size="14" text-anchor="middle" class="tm">1</text><text x="270" y="24" font-size="14" text-anchor="middle" class="tm">2</text><text x="340" y="24" font-size="14" text-anchor="middle" class="tm">3</text><text x="410" y="24" font-size="14" text-anchor="middle" class="tm">4</text><text x="480" y="24" font-size="14" text-anchor="middle" class="tm">5</text><text x="550" y="24" font-size="14" text-anchor="middle" class="tm">6</text><text x="620" y="24" font-size="14" text-anchor="middle" class="tm">7</text><text x="690" y="24" font-size="14" text-anchor="middle" class="tm">8</text><text x="118" y="62" font-size="16" text-anchor="end">clk</text><path d="M130 68V44H165.0V68H200V44H235.0V68H270V44H305.0V68H340V44H375.0V68H410V44H445.0V68H480V44H515.0V68H550V44H585.0V68H620V44H655.0V68H690" class="ln"/><text x="118" y="122" font-size="16" text-anchor="end">req</text><path d="M130 128H170V104H230V128H310V104H370V128H690" class="ln"/><text x="118" y="182" font-size="16" text-anchor="end">grant</text><path d="M130 188H590V164H650V188H690" class="ln"/><text x="118" y="236" font-size="16" text-anchor="end">check 1</text><path d="M200 230H480" class="lnw"/><circle cx="480" cy="230" r="8" class="fillw"/><text x="494" y="222" font-size="15" text-anchor="start" class="tw">grant low at 5: fails</text><text x="118" y="286" font-size="16" text-anchor="end">check 2</text><path d="M340 280H620" class="lng"/><circle cx="620" cy="280" r="8" class="fillg"/><text x="606" y="272" font-size="15" text-anchor="end">grant high at 7: passes</text></svg><figcaption>req at 1 and req at 3 each start their own 4 cycle check. The counter version forgets the first one.</figcaption></figure>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>at every rising clk:
+    if req:                     restart count at 1
+    else if count is running:   add 1
+    if count is 4 and grant is low:
+        report &quot;no grant&quot;
+
+problem: a second req restarts the count,
+         so the first request is forgotten</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>always @(posedge clk) begin
+  if (req) count &lt;= 1;
+  else if (count != 0) count &lt;= count + 1;
+  if (count == 4 &amp;&amp; !grant) $error(&quot;no grant&quot;);
+end</code></pre></details></div>
+<p>This breaks when a second req arrives before the first grant. The counter restarts at 1, so the first request is silently forgotten and its missing grant is never reported.</p>
+<p>The SVA version handles overlapping requests correctly, because each req starts its own independent check.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>at every rising clk where req is high:
+    start a separate check: grant must be high 4 clocks later</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>assert property (@(posedge clk) req |-&gt; ##4 grant);</code></pre></details></div>
+<p>Two new symbols appear here.</p>
+<ol>
+<li>|-&gt; means implies. If the left side is true at this clock edge, the right side must hold, starting at the same edge.</li>
+<li>##4 means wait 4 clock cycles.</li>
+</ol>
+<p>So it reads, whenever req is high, grant must be high 4 cycles later.</p>
+<h3 id="step-4"><span class="stepno">Step 4</span>Assertions are formal</h3>
+<p>SVA is a formal specification language. Unlike an English spec, it has exactly one meaning, so cases like overlapping requests cannot be left vague.</p>
+<p>The same assertion can be checked two ways. A simulator checks it on whatever stimulus you run. A formal tool proves it mathematically for every possible input.</p>
+<h3 id="step-5"><span class="stepno">Step 5</span>Where assertions go</h3>
+<ul>
+<li>At interfaces. They describe the legal behavior of signals between blocks, such as bus protocols, memory reads and writes, data transformations and arbitration. This is black box verification, since it ignores how the blocks work inside.</li>
+<li>Inside a design module. The designer writes them next to the RTL, checking internal signals. This is white box verification.</li>
+</ul>
+<p>The slide example is an 8 bit register with asynchronous reset and synchronous set that rotates left by one bit each clock. It has two assertions written inside module and endmodule.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>register q, at a rising clk or a rising rst:
+    if rst:       q = all 0
+    else if set:  q = all 1
+    else:         rotate q left by one bit
+
+check_shift (switched off during reset):
+    if set was low, then next clock
+    q must equal last clock&#x27;s q rotated left
+
+check_rst (checked after values settle):
+    if rst is high, q must be 0</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>module rotreg (input logic clk, rst, set, output logic [7:0] q);
+  always_ff @(posedge clk or posedge rst)
+    if (rst)      q &lt;= &#x27;0;
+    else if (set) q &lt;= &#x27;1;
+    else          q &lt;= {q[6:0], q[7]};
+
+  check_shift: assert property (@(posedge clk) disable iff (rst)
+                 !set |=&gt; q == {$past(q[6:0]), $past(q[7])});
+
+  check_rst: assert final (!rst || q == &#x27;0);
+endmodule</code></pre></details></div>
+<p>This is a sketch of the idea rather than a copy of the slide. Three new pieces appear.</p>
+<ol>
+<li><code>$past(x)</code> returns the value x had on the previous clock edge.</li>
+<li>disable iff (rst) switches the check off while reset is active, because the rule only applies during normal operation.</li>
+<li>assert final marks a deferred assertion, which waits until values settle in the time step before checking. Later lectures explain it.</li>
+</ol>
+<p>The |=&gt; operator is like |-&gt; but starts the right side one clock later.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>Immediate assertions</h3>
+<p>Everything so far is a concurrent assertion, which runs on a clock and can span many cycles. An immediate assertion is just a check inside procedural code, run when that line executes, like an if statement.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>at every rising clk:
+    check that grant is NOT high while req is low
+    if it is, print an error with the time</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>always @(posedge clk)
+  assert (!(gnt &amp;&amp; !req))
+    else $error(&quot;Grant asserted without a request at %0t&quot;, $time);</code></pre></details></div>
+<h3 id="step-7"><span class="stepno">Step 7</span>Why assertions pay off</h3>
+<p>A scoreboard checks outputs at the edge of the DUT. By then a bad value may have passed through several pipeline stages, and you have to trace backward to find where it started.</p>
+<figure class="fig"><svg viewBox="0 0 760 190" role="img" aria-label="Assertion at the source versus scoreboard at the output"><rect x="20" y="70" width="120" height="64" rx="10" class="bx"/><text x="80.0" y="108.7" font-size="19" text-anchor="middle" font-weight="700">stage 1</text><path d="M140 102H170" class="ln" marker-end="url(#ah)"/><rect x="170" y="70" width="120" height="64" rx="10" class="bxw"/><text x="230.0" y="98.2" font-size="19" text-anchor="middle" font-weight="700">stage 2</text><text x="230.0" y="119.0" font-size="16" text-anchor="middle" class="tm">bug here</text><path d="M290 102H320" class="ln" marker-end="url(#ah)"/><rect x="320" y="70" width="120" height="64" rx="10" class="bx"/><text x="380.0" y="108.7" font-size="19" text-anchor="middle" font-weight="700">stage 3</text><path d="M440 102H470" class="ln" marker-end="url(#ah)"/><rect x="470" y="70" width="120" height="64" rx="10" class="bx"/><text x="530.0" y="108.7" font-size="19" text-anchor="middle" font-weight="700">stage 4</text><path d="M590 102H620" class="ln" marker-end="url(#ah)"/><rect x="620" y="70" width="120" height="64" rx="10" class="bx"/><text x="680.0" y="108.7" font-size="19" text-anchor="middle" font-weight="700">scoreboard</text><text x="230" y="48" font-size="16" text-anchor="middle" class="ta" font-weight="700">an assertion here fires the same cycle</text><text x="740" y="170" font-size="16" text-anchor="end" class="tm">a scoreboard sees it 2 cycles later</text></svg><figcaption>An assertion points at the stage that broke. A scoreboard only sees the result after it travels.</figcaption></figure>
+<p>An assertion inside the RTL fires at the exact block and cycle where the rule broke. In the slide's 4 stage pipeline example, a control signal wrongly cleared in stage 2 shows up at the output two cycles later. An assertion on that stage 2 signal points straight at the cause.</p>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Writing the counter style check by hand and missing overlapping cases.</li>
+<li>Forgetting disable iff, so every reset produces false failures.</li>
+<li>Mixing up |-&gt; (same cycle) and |=&gt; (next cycle).</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>Write an assertion that a and b are never both 1 at a rising clock edge.</div><details class="answer"><summary>Show answer</summary><div><p><code>assert property (@(posedge clk) !(a &amp;&amp; b));</code></p></div></details></li>
+<li><div>In plain words, what does <code>req |-&gt; ##2 ack</code> require?</div><details class="answer"><summary>Show answer</summary><div><p>Whenever req is high at a clock edge, ack must be high 2 edges later.</p></div></details></li>
+<li><div>Is <code>req |=&gt; ack</code> the same as <code>req |-&gt; ##1 ack</code>?</div><details class="answer"><summary>Show answer</summary><div><p>Yes, they mean the same thing.</p></div></details></li>
+<li><div>req is high at cycles 1 and 3. Using <code>req |-&gt; ##4 grant</code>, at which cycles must grant be high?</div><details class="answer"><summary>Show answer</summary><div><p>Cycles 5 and 7.</p></div></details></li>
+<li><div>In problem 4, the counter version from Step 3 is used instead. grant is high at cycle 7 only. What does the counter report, and what does the assertion report?</div><details class="answer"><summary>Show answer</summary><div><p>The counter restarts at cycle 3 and checks only cycle 7, which passes, so it reports nothing. The assertion fails for the request at cycle 1, since grant was low at cycle 5.</p></div></details></li>
+<li><div>Write an assertion that whenever en is high, the 4 bit counter cnt equals its previous value plus 1 on the next cycle, disabled during rst.</div><details class="answer"><summary>Show answer</summary><div><p><code>assert property (@(posedge clk) disable iff (rst) en |=&gt; cnt == $past(cnt) + 4'd1);</code></p></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="09-11-advanced-oop.html"><span class="dir">Previous</span>Lectures 9 to 11. Advanced OOP and Testbench Guidelines</a><a class="next" href="12-uvm-adder.html"><span class="dir">Next</span>Lecture 12. UVM Adder Example</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

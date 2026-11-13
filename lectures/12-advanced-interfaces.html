@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 12. Advanced Interfaces | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lecture 12</span>Advanced Interfaces</h1><details class="toc"><summary>Steps in this lecture (7)</summary><ol><li><a href="#step-1">Back to the 4x4 ATM router</a></li><li><a href="#step-2">The problem with physical interfaces</a></li><li><a href="#step-3">Virtual interface basics</a></li><li><a href="#step-4">The testbench with virtual interfaces</a></li><li><a href="#step-5">The monitor class</a></li><li><a href="#step-6">Two ways to connect a test to its interfaces</a></li><li><a href="#step-7">Arrays of replicated components</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">A virtual interface is a handle that points to a real interface, the way a class handle points to an object. It lets one driver class or one monitor class serve many identical ports, with the actual wires chosen at run time. This lecture follows chapter 10 of Spear and Tumbush.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Back to the 4x4 ATM router</h3>
+<p>The router from Lecture 5 has 4 receive ports and 4 transmit ports. Each port has an 8 bit data bus plus one bit control and status signals soc, en, clav, rclk, tclk and clk.</p>
+<p>Each receive interface and each transmit interface has a TB modport, a DUT modport and a clocking block named cb.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>Rx_if bundles data (8 bits), soc, en, clav, rclk. Clock comes in.
+
+clocking block on the rising clk:
+    the testbench drives data, soc and clav
+    the testbench samples en
+
+DUT view: drives en and rclk, reads data, soc and clav
+TB view:  goes through the clocking block</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>interface Rx_if (input logic clk);
+  logic [7:0] data;
+  logic soc, en, clav, rclk;
+
+  clocking cb @(posedge clk);
+    output data, soc, clav;   <span class="c">// testbench drives these</span>
+    input  en;                <span class="c">// testbench samples this</span>
+  endclocking
+
+  modport DUT (output en, rclk, input data, soc, clav);
+  modport TB  (clocking cb);
+endinterface</code></pre></details></div>
+<p>The top module makes arrays of interfaces, then hands them to the testbench and the DUT.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>top:
+    4 receive bundles and 4 transmit bundles, all on clk
+    plug every bundle into the testbench AND into the router
+    clock flips every 20 time units</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>module top;
+  logic clk, rst;
+  Rx_if Rx[4] (clk);
+  Tx_if Tx[4] (clk);
+  test t1 (Rx[0], Rx[1], Rx[2], Rx[3], Tx[0], Tx[1], Tx[2], Tx[3], clk, rst);
+  atm_router a1 (Rx[0], Rx[1], Rx[2], Rx[3], Tx[0], Tx[1], Tx[2], Tx[3], clk, rst);
+  initial begin clk = 0; forever #20 clk = !clk; end
+endmodule</code></pre></details></div>
+<h3 id="step-2"><span class="stepno">Step 2</span>The problem with physical interfaces</h3>
+<p>With only physical interfaces, a monitor task must name one specific port, such as Tx0. You end up writing receive_cell0, receive_cell1 and so on, four nearly identical copies.</p>
+<figure class="fig"><svg viewBox="0 0 760 340" role="img" aria-label="One driver class connected to four interfaces through handles"><rect x="20" y="138" width="170" height="84" rx="10" class="bxq"/><text x="105.0" y="176.2" font-size="19" text-anchor="middle" font-weight="700">class Driver</text><text x="105.0" y="197.1" font-size="16" text-anchor="middle" class="tm">written once</text><rect x="270" y="30" width="180" height="56" rx="10" class="bx"/><text x="360.0" y="64.7" font-size="19" text-anchor="middle" font-weight="700">drv[0]</text><rect x="560" y="30" width="180" height="56" rx="10" class="bxa"/><text x="650.0" y="64.7" font-size="19" text-anchor="middle" font-weight="700">Rx0 bundle</text><path d="M190 180H230V58H270" class="ln" marker-end="url(#ah)"/><path d="M450 58H560" class="ln" marker-end="url(#ah)"/><text x="505" y="50" font-size="14" text-anchor="middle" class="tm">vRx[0]</text><rect x="270" y="110" width="180" height="56" rx="10" class="bx"/><text x="360.0" y="144.7" font-size="19" text-anchor="middle" font-weight="700">drv[1]</text><rect x="560" y="110" width="180" height="56" rx="10" class="bxa"/><text x="650.0" y="144.7" font-size="19" text-anchor="middle" font-weight="700">Rx1 bundle</text><path d="M190 180H230V138H270" class="ln" marker-end="url(#ah)"/><path d="M450 138H560" class="ln" marker-end="url(#ah)"/><text x="505" y="130" font-size="14" text-anchor="middle" class="tm">vRx[1]</text><rect x="270" y="190" width="180" height="56" rx="10" class="bx"/><text x="360.0" y="224.7" font-size="19" text-anchor="middle" font-weight="700">drv[2]</text><rect x="560" y="190" width="180" height="56" rx="10" class="bxa"/><text x="650.0" y="224.7" font-size="19" text-anchor="middle" font-weight="700">Rx2 bundle</text><path d="M190 180H230V218H270" class="ln" marker-end="url(#ah)"/><path d="M450 218H560" class="ln" marker-end="url(#ah)"/><text x="505" y="210" font-size="14" text-anchor="middle" class="tm">vRx[2]</text><rect x="270" y="270" width="180" height="56" rx="10" class="bx"/><text x="360.0" y="304.6" font-size="19" text-anchor="middle" font-weight="700">drv[3]</text><rect x="560" y="270" width="180" height="56" rx="10" class="bxa"/><text x="650.0" y="304.6" font-size="19" text-anchor="middle" font-weight="700">Rx3 bundle</text><path d="M190 180H230V298H270" class="ln" marker-end="url(#ah)"/><path d="M450 298H560" class="ln" marker-end="url(#ah)"/><text x="505" y="290" font-size="14" text-anchor="middle" class="tm">vRx[3]</text></svg><figcaption>Each driver object holds a virtual interface handle, so the same code drives whichever port it was given.</figcaption></figure>
+<p>What you want is one Driver class and one Monitor class, each built four times, each pointed at a different port.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>Virtual interface basics</h3>
+<ol>
+<li>Declare one with the word virtual, as in <code>virtual Rx_if.TB vRx;</code>.</li>
+<li>Until you assign it, it holds null, just like an unconstructed class handle.</li>
+<li>It can be a class property, a function or task argument, or an array element.</li>
+<li>A class usually receives it through its new() function.</li>
+</ol>
+<p>The binding happens at run time, not compile time, which is why the same code can drive any port. Section 25.9 of IEEE Std 1800-2012 has more detail.</p>
+<h3 id="step-4"><span class="stepno">Step 4</span>The testbench with virtual interfaces</h3>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the test receives 8 real bundles through its ports
+
+make 4 driver slots and 4 monitor slots
+vRx = handles to Rx0, Rx1, Rx2, Rx3
+vTx = handles to Tx0, Tx1, Tx2, Tx3
+
+for i = 0 to 3:
+    driver i  gets handle vRx[i]
+    monitor i gets handle vTx[i]</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>program automatic test (Rx_if.TB Rx0, Rx1, Rx2, Rx3,
+                        Tx_if.TB Tx0, Tx1, Tx2, Tx3,
+                        input logic clk, output logic rst);
+  Driver  drv[4];
+  Monitor mon[4];
+  virtual Rx_if.TB vRx[4] = &#x27;{Rx0, Rx1, Rx2, Rx3};
+  virtual Tx_if.TB vTx[4] = &#x27;{Tx0, Tx1, Tx2, Tx3};
+
+  initial foreach (drv[i]) begin
+    drv[i] = new(vRx[i]);   <span class="c">// driver i talks to receive port i</span>
+    mon[i] = new(vTx[i]);   <span class="c">// monitor i watches transmit port i</span>
+  end
+endprogram</code></pre></details></div>
+<p>The slides also show a shorter form. Put the arrays straight in the port list, as in <code>program automatic test (Rx_if.TB Rx[4], Tx_if.TB Tx[4], ...);</code>, which has the same effect.</p>
+<h3 id="step-5"><span class="stepno">Step 5</span>The monitor class</h3>
+<p>The monitor now refers to its own handle instead of the fixed name Tx0. A typedef keeps the long type name short.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>vTx_t is a short name for &quot;handle to a transmit bundle, TB view&quot;
+
+Monitor stores one such handle, given to it in new
+
+receive_cell:
+    say &quot;ready&quot; (clav = 1)
+    wait for a clock edge where soc is 1
+    then read the data bytes one by one</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>typedef virtual Tx_if.TB vTx_t;
+
+class Monitor;
+  vTx_t Tx;
+  function new(vTx_t Tx);
+    this.Tx = Tx;
+  endfunction
+
+  task receive_cell();
+    Tx.cb.clav &lt;= 1;                  <span class="c">// ready to accept a cell</span>
+    @(Tx.cb iff Tx.cb.soc == 1);      <span class="c">// wait for start of cell</span>
+    <span class="c">// read Tx.cb.data byte by byte here</span>
+  endtask
+endclass</code></pre></details></div>
+<h3 id="step-6"><span class="stepno">Step 6</span>Two ways to connect a test to its interfaces</h3>
+<p>Option 1 is port lists. The top module passes the interface into the test's ports. It is simple, but adding a second interface means editing both the top module and the test's port list.</p>
+<figure class="fig"><svg viewBox="0 0 760 280" role="img" aria-label="Port list compared with a cross module reference"><text x="190" y="24" font-size="18" text-anchor="middle" font-weight="700">port list</text><text x="570" y="24" font-size="18" text-anchor="middle" font-weight="700">cross module reference</text><rect x="20" y="40" width="340" height="200" rx="10" class="grid"/><text x="36" y="64" font-size="15" text-anchor="start" class="tm" font-weight="700">top</text><rect x="150" y="80" width="120" height="50" rx="10" class="bxa"/><text x="210.0" y="111.7" font-size="19" text-anchor="middle" font-weight="700">arbif</text><rect x="240" y="170" width="100" height="50" rx="10" class="bx"/><text x="290.0" y="201.7" font-size="19" text-anchor="middle" font-weight="700">arb</text><rect x="60" y="170" width="120" height="50" rx="10" class="bx"/><text x="120.0" y="201.7" font-size="19" text-anchor="middle" font-weight="700">test</text><path d="M230 130V150H290V170" class="ln" marker-end="url(#ah)"/><rect x="400" y="40" width="340" height="200" rx="10" class="grid"/><text x="416" y="64" font-size="15" text-anchor="start" class="tm" font-weight="700">top</text><rect x="530" y="80" width="120" height="50" rx="10" class="bxa"/><text x="590.0" y="111.7" font-size="19" text-anchor="middle" font-weight="700">arbif</text><rect x="620" y="170" width="100" height="50" rx="10" class="bx"/><text x="670.0" y="201.7" font-size="19" text-anchor="middle" font-weight="700">arb</text><rect x="440" y="170" width="120" height="50" rx="10" class="bx"/><text x="500.0" y="201.7" font-size="19" text-anchor="middle" font-weight="700">test</text><path d="M610 130V150H670V170" class="ln" marker-end="url(#ah)"/><path d="M210 130V150H100V170" class="ln" marker-end="url(#ah)"/><path d="M480 170V105H530" class="ln dash" marker-end="url(#ah)"/><text x="488" y="156" font-size="14" text-anchor="start" class="tm">top.arbif</text><text x="190" y="264" font-size="16" text-anchor="middle" class="tm">passed in through ports</text><text x="570" y="264" font-size="16" text-anchor="middle" class="tm">the test reaches in by path</text></svg><figcaption>An XMR lets top gain new interfaces without changing the test&#x27;s ports, at the cost of depending on top&#x27;s names.</figcaption></figure>
+<p>Option 2 is a cross module reference, or XMR. An XMR is a hierarchical path like top.arbif that reaches into another module by name. The test has no ports and grabs the interface itself.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the test has no ports at all
+
+reach into top and grab arbif by its path   (top.arbif)
+drive request = 0 at the next edge
+wait one clock</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>program automatic test;
+  virtual arb_if.TEST arbif = top.arbif;   <span class="c">// XMR</span>
+  initial begin
+    arbif.cb.request &lt;= 0;
+    @arbif.cb;
+  end
+endprogram</code></pre></details></div>
+<p>Now the top module can gain new interfaces and old tests still work unchanged. The cost is that the test depends on names inside top. If you are not reusing tests across designs, plain port lists are fine.</p>
+<h3 id="step-7"><span class="stepno">Step 7</span>Arrays of replicated components</h3>
+<p>The last example builds a 1D array of identical 8 bit counters, and the same idea extends to 2D meshes. The interface holds din, dout, load and reset_l, plus a clocking block and modports. A generate loop places one counter per interface.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>NUM_XI = 2 counters
+the clock flips every 20
+
+make 2 bundles and the test
+for i = 0 to 1:
+    place counter i on bundle i</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>module top;
+  parameter NUM_XI = 2;
+  bit clk;
+  initial forever #20 clk = !clk;
+
+  X_if xi [NUM_XI] (clk);
+  test tb ();
+
+  generate
+    for (genvar i = 0; i &lt; NUM_XI; i++) begin : gen
+      counter c (xi[i]);
+    end
+  endgenerate
+endmodule</code></pre></details></div>
+<p>The test grabs the whole array by XMR and builds one driver per counter. You could pass NUM_XI as a parameter instead of reaching for it.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>one handle per counter bundle
+
+copy all of top&#x27;s bundles into the handle array
+make NUM_XI drivers
+driver i gets bundle i and its own number i</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>program automatic test;
+  virtual X_if.TB vxi [top.NUM_XI];
+  Driver driver [];
+  initial begin
+    vxi = top.xi;
+    driver = new[top.NUM_XI];
+    foreach (driver[i]) driver[i] = new(vxi[i], i);
+  end
+endprogram</code></pre></details></div>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Using a virtual interface before assigning it, which is a null access.</li>
+<li>Forgetting the modport in the virtual interface type, which loses the direction checks.</li>
+<li>Hard coding one port name inside a class, which defeats the purpose.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>In one sentence, how is a virtual interface different from an interface?</div><details class="answer"><summary>Show answer</summary><div><p>An interface is the actual bundle of wires, while a virtual interface is a handle that points to one.</p></div></details></li>
+<li><div>A class has <code>virtual Rx_if.TB vif;</code> and its new() never sets it. What happens when run() does <code>vif.cb.soc &lt;= 1;</code>?</div><details class="answer"><summary>Show answer</summary><div><p>A null access error at run time.</p></div></details></li>
+<li><div>Write the declaration and initialization of an array of 4 virtual Tx_if.TB handles from physical ports Tx0 to Tx3.</div><details class="answer"><summary>Show answer</summary><div><p><code>virtual Tx_if.TB vTx[4] = '{Tx0, Tx1, Tx2, Tx3};</code></p></div></details></li>
+<li><div>Why is one Driver class built four times better than four Driver classes?</div><details class="answer"><summary>Show answer</summary><div><p>Any fix or feature is written once, and the ports cannot drift apart.</p></div></details></li>
+<li><div>Give one advantage and one drawback of using an XMR like top.arbif inside the test.</div><details class="answer"><summary>Show answer</summary><div><p>Adding interfaces in top does not change the test's ports. The drawback is that the test now depends on hierarchy names in top.</p></div></details></li>
+<li><div>Write a Driver class that takes a virtual Rx_if.TB in new() and has a task send_byte(input logic [7:0] b) that drives data with soc high for one clock.</div><details class="answer"><summary>Show answer</summary><div><p>One version is below.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>Driver keeps a handle rx, given to it in new
+
+send_byte(b):
+    at the next edge, drive data = b and soc = 1
+    wait one clock
+    drive soc = 0</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class Driver;
+  virtual Rx_if.TB rx;
+  function new(virtual Rx_if.TB rx);
+    this.rx = rx;
+  endfunction
+
+  task send_byte(input logic [7:0] b);
+    rx.cb.data &lt;= b;
+    rx.cb.soc  &lt;= 1;
+    @rx.cb;
+    rx.cb.soc  &lt;= 0;
+  endtask
+endclass</code></pre></details></div></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="12-uvm-adder.html"><span class="dir">Previous</span>Lecture 12. UVM Adder Example</a><a class="next" href="13-14-coverage-in-depth.html"><span class="dir">Next</span>Lectures 13 and 14. Functional Coverage in Depth</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

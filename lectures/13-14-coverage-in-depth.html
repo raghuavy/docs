@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lectures 13 and 14. Functional Coverage in Depth | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lectures 13 and 14</span>Functional Coverage in Depth</h1><details class="toc"><summary>Steps in this lecture (12)</summary><ol><li><a href="#step-1">Seeds</a></li><li><a href="#step-2">Organizing results</a></li><li><a href="#step-3">The coverage feedback loop</a></li><li><a href="#step-4">Code coverage versus functional coverage</a></li><li><a href="#step-5">Gather information, not data</a></li><li><a href="#step-6">The worked example</a></li><li><a href="#step-7">Embedded covergroups</a></li><li><a href="#step-8">auto_bin_max for one point or a whole group</a></li><li><a href="#step-9">Covering an expression, and width</a></li><li><a href="#step-10">Named bins in detail</a></li><li><a href="#step-11">Conditional coverage, enums and wildcards</a></li><li><a href="#step-12">Cross coverage done well</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">This lecture revisits Lecture 4 using chapter 9 of Spear and Tumbush, and adds the workflow around coverage. You learn how to run many seeds, read the report, and shape bins and crosses so the report says something useful. The covergroup basics from Lecture 4 still apply, so this section only covers what is new.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Seeds</h3>
+<p>The seed is the starting number for the random generator. Every run with the default seed produces exactly the same values, so rerunning teaches you nothing new. Each run should get a different seed.</p>
+<ul>
+<li>A common choice is the time of day.</li>
+<li>When many jobs start at once on a farm of machines, combine the time with the machine name or process ID so no two jobs share a seed.</li>
+</ul>
+<p>In VCS you pass it on the command line.</p>
+<div class="cmd"><span class="label">Command</span><pre><code>./simv +ntb_random_seed=1234</code></pre></div>
+<p>Two system functions read command line options inside your code. <code>$test$plusargs("name")</code> returns true if +name was given. <code>$value$plusargs("name=%d", var)</code> also reads its value into var.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>if the command line has +ntb_random_seed=N:
+    read N into seed
+    print &quot;Running with seed N&quot;</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>int seed;
+initial if ($value$plusargs(&quot;ntb_random_seed=%d&quot;, seed))
+  $display(&quot;Running with seed %0d&quot;, seed);</code></pre></details></div>
+<h3 id="step-2"><span class="stepno">Step 2</span>Organizing results</h3>
+<p>Each run produces a log file and coverage data. Record the seed with them, or you cannot reproduce a failure. The slides suggest one directory per run with the seed in its name.</p>
+<p>In VCS, <code>urg -dir simv.vdb</code> builds the coverage report into a folder called urgReport. URG stands for Unified Report Generator.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>The coverage feedback loop</h3>
+<ol>
+<li>Compile once, then run the test many times with different seeds.</li>
+<li>Check that no run found a design bug. Coverage from a run that found a bug is thrown away.</li>
+<li>Merge coverage across runs.</li>
+<li>If coverage is short of 100 percent, first try more seeds or longer runs.</li>
+<li>Then add constraints that steer stimulus into the missed areas.</li>
+<li>Last, write directed tests for corners random stimulus will not reach.</li>
+</ol>
+<figure class="fig"><svg viewBox="0 0 760 290" role="img" aria-label="The coverage feedback loop"><rect x="40" y="40" width="250" height="74" rx="10" class="bx"/><text x="165.0" y="73.2" font-size="19" text-anchor="middle" font-weight="700">run the test</text><text x="165.0" y="94.0" font-size="16" text-anchor="middle" class="tm">with many seeds</text><rect x="470" y="40" width="250" height="74" rx="10" class="bxw"/><text x="595.0" y="73.2" font-size="19" text-anchor="middle" font-weight="700">any design bugs?</text><text x="595.0" y="94.0" font-size="16" text-anchor="middle" class="tm">fix them first</text><rect x="470" y="196" width="250" height="74" rx="10" class="bx"/><text x="595.0" y="229.2" font-size="19" text-anchor="middle" font-weight="700">merge coverage</text><text x="595.0" y="250.1" font-size="16" text-anchor="middle" class="tm">from clean runs</text><rect x="40" y="196" width="250" height="74" rx="10" class="bxa"/><text x="165.0" y="229.2" font-size="19" text-anchor="middle" font-weight="700">100 percent?</text><text x="165.0" y="250.1" font-size="16" text-anchor="middle" class="tm">if not, adjust</text><path d="M290 77H470" class="ln" marker-end="url(#ah)"/><path d="M595 114V196" class="ln" marker-end="url(#ah)"/><path d="M470 233H290" class="ln" marker-end="url(#ah)"/><path d="M165 196V114" class="ln" marker-end="url(#ah)"/><text x="607" y="160" font-size="15" text-anchor="start" class="tm">no bugs</text><text x="153" y="160" font-size="15" text-anchor="end" class="tm">not yet</text></svg><figcaption>When coverage is short, try more seeds first, then new constraints, then directed tests for the last corners.</figcaption></figure><figure class="fig"><svg viewBox="0 0 760 300" role="img" aria-label="Coverage rises fast, flattens, then jumps after new constraints"><path d="M90 40V250H720" class="ln"/><path d="M90 40H720" class="grid dash"/><text x="80" y="46" font-size="15" text-anchor="end" class="tm">100</text><text x="80" y="256" font-size="15" text-anchor="end" class="tm">0</text><path d="M90.0 250.0L96.3 239.6L102.6 229.8L108.9 220.6L115.2 211.9L121.5 203.7L127.8 196.0L134.1 188.8L140.4 182.0L146.7 175.5L153.0 169.5L159.3 163.8L165.6 158.4L171.9 153.3L178.2 148.6L184.5 144.1L190.8 139.8L197.1 135.9L203.4 132.1L209.7 128.6L216.0 125.3L222.3 122.1L228.6 119.2L234.9 116.4L241.2 113.8L247.5 111.3L253.8 109.0L260.1 106.8L266.4 104.8L272.7 102.8L279.0 101.0L285.3 99.3L291.6 97.7L297.9 96.1L304.2 94.7L310.5 93.4L316.8 92.1L323.1 90.9L329.4 89.8L335.7 88.7L342.0 87.7L348.3 86.8L354.6 85.9L360.9 85.0L367.2 84.2L373.5 83.5L379.8 82.8L386.1 82.1L392.4 81.5L398.7 80.9L405.0 80.4L411.3 79.9L417.6 79.4L423.9 78.9L430.2 78.5L436.5 78.1L442.8 77.7L449.1 77.3L455.4 77.0L461.7 76.7L468.0 76.4L474.3 73.2L480.6 70.4L486.9 67.8L493.2 65.4L499.5 63.2L505.8 61.2L512.1 59.4L518.4 57.7L524.7 56.2L531.0 54.8L537.3 53.5L543.6 52.4L549.9 51.3L556.2 50.3L562.5 49.4L568.8 48.6L575.1 47.9L581.4 47.2L587.7 46.6L594.0 46.0L600.3 45.5L606.6 45.0L612.9 44.6L619.2 44.2L625.5 43.8L631.8 43.5L638.1 43.2L644.4 42.9L650.7 42.7L657.0 42.4L663.3 42.2L669.6 42.0L675.9 41.9L682.2 41.7L688.5 41.6L694.8 41.4L701.1 41.3L707.4 41.2L713.7 41.1L720.0 41.0" class="lna"/><path d="M468 50V250" class="grid dash"/><text x="458.0" y="120" font-size="15" text-anchor="end" class="tm">flattens out</text><text x="478.0" y="214" font-size="15" text-anchor="start" class="ta" font-weight="700">new constraints</text><text x="405.0" y="284" font-size="16" text-anchor="middle" class="tm">number of runs</text><text x="80" y="26" font-size="15" text-anchor="start" class="tm">coverage, percent</text></svg><figcaption>An illustration of the shape described in the slides, not measured data.</figcaption></figure>
+<p>Coverage climbs quickly at first and then flattens out. That flat part is your signal to change constraints rather than just add seeds.</p>
+<h3 id="step-4"><span class="stepno">Step 4</span>Code coverage versus functional coverage</h3>
+<p>Code coverage is measured automatically by the simulator from the RTL. It is also called implementation coverage.</p>
+<ul>
+<li>Line coverage counts which lines ran.</li>
+<li>Path coverage counts which branches through the code ran.</li>
+<li>Toggle coverage counts which signals switched between 0 and 1.</li>
+<li>FSM coverage counts which states and transitions of a state machine were visited.</li>
+</ul>
+<p>Code coverage cannot tell you about a feature that was never written. Functional coverage comes from the verification plan, so it can show a missing feature as an empty bin. Assertion coverage, which counts how often each assertion was exercised, is the third kind. A good plan uses all three.</p>
+<h3 id="step-5"><span class="stepno">Step 5</span>Gather information, not data</h3>
+<p>A huge report is hard to act on. Aim bins at the interesting cases.</p>
+<ul>
+<li>A FIFO with 1K entries has 1K possible fill levels. The important ones are full and empty. Covering a full to empty run hits both corners with two bins.</li>
+<li>An N bit counter has 2 to the N states. Cover a few random values, some interesting values, and the rollover from all ones to all zeros.</li>
+</ul>
+<h3 id="step-6"><span class="stepno">Step 6</span>The worked example</h3>
+<p>A Transaction class has a random 32 bit data and a random 3 bit dst, and only dst is covered.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>Transaction: random 32 bit data and random 3 bit dst
+
+covergroup CovDst watches tr.dst
+
+build the covergroup
+repeat 32 times:
+    build a new transaction
+    randomize it
+    take a coverage snapshot
+
+-&gt;  after 32: 7 of 8 dst values seen
+-&gt;  after 33: all 8 seen</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class Transaction;
+  rand bit [31:0] data;
+  rand bit [2:0]  dst;
+endclass
+
+program automatic test;
+  Transaction tr;
+  covergroup CovDst;
+    coverpoint tr.dst;
+  endgroup
+
+  initial begin
+    CovDst ck = new();
+    repeat (32) begin
+      tr = new();
+      assert(tr.randomize());
+      ck.sample();
+    end
+  end
+endprogram</code></pre></details></div>
+<p>After 32 transactions, 7 of the 8 dst values were seen and only 0 was missing. Running 33 transactions reached all 8, 100 percent. Random stimulus gets the last bins slowly.</p>
+<h3 id="step-7"><span class="stepno">Step 7</span>Embedded covergroups</h3>
+<p>A covergroup declared inside a class is an embedded covergroup. It must be constructed inside the class's new() function. Its instance name is the covergroup name itself, as in <code>CovDst = new();</code>.</p>
+<p>Give covergroups and cover points descriptive names, because those names are all you see in the report.</p>
+<h3 id="step-8"><span class="stepno">Step 8</span>auto_bin_max for one point or a whole group</h3>
+<p>With a 3 bit dst and <code>option.auto_bin_max = 2</code>, the two automatic bins are [0:3] and [4:7]. Placed inside one coverpoint it affects only that point. Placed at the covergroup level it applies to every point in the group.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>for this whole group: at most 2 automatic bins per watcher
+
+watch tr.dst             -&gt;  bins [0:3] and [4:7]
+watch low 4 bits of data -&gt;  2 bins of 8 values each</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>covergroup CovGroup;
+  option.auto_bin_max = 2;     <span class="c">// whole group</span>
+  coverpoint tr.dst;
+  coverpoint tr.data[3:0];
+endgroup</code></pre></details></div>
+<h3 id="step-9"><span class="stepno">Step 9</span>Covering an expression, and width</h3>
+<p>A cover point can be an expression. Watch the width, though, because the expression's width sets how many automatic bins exist.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>len16: watch hdr_len + payload_len
+       done in 4 bit math, so sums above 15 wrap around
+
+len32: the same sum plus a 5 bit zero
+       done in 5 bit math, so nothing wraps</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code><span class="c">// hdr_len is 3 bits, payload_len is 4 bits</span>
+len16 : coverpoint (p.hdr_len + p.payload_len);          <span class="c">// 4 bit result, only 16 bins</span>
+len32 : coverpoint (p.hdr_len + p.payload_len + 5&#x27;b0);   <span class="c">// 5 bit result, 32 bins</span></code></pre></details></div>
+<p>The largest true sum is 7 + 15 = 22, which needs 5 bits. Adding 5'b0 forces 5 bit math so large sums are not wrapped.</p>
+<h3 id="step-10"><span class="stepno">Step 10</span>Named bins in detail</h3>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>watch kind (4 bits) with these bins:
+    zero    just 0
+    lo      ONE bin for 1, 2, 3 and 5
+    hi[]    a SEPARATE bin for each of 8 to 15
+    misc    everything else (not counted in the score)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>coverpoint tr.kind {          <span class="c">// kind is 4 bits</span>
+  bins zero  = {0};           <span class="c">// one bin for 0</span>
+  bins lo    = {[1:3], 5};    <span class="c">// one bin for 1, 2, 3 and 5</span>
+  bins hi[]  = {[8:$]};       <span class="c">// a separate bin for each of 8 to 15</span>
+  bins misc  = default;       <span class="c">// everything else, 4, 6 and 7</span>
+}</code></pre></details></div>
+<ol>
+<li>Square brackets after the name, as in hi[], make one bin per value instead of one bin for the group.</li>
+<li>The dollar sign in [8:$] means the largest possible value.</li>
+<li>A default bin is not counted toward the coverage percentage.</li>
+</ol>
+<h3 id="step-11"><span class="stepno">Step 11</span>Conditional coverage, enums and wildcards</h3>
+<p>Two ways to skip sampling during reset are equivalent. The iff form is more compact.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>option 1: watch port only while reset is low
+
+option 2, from the test:
+    stop collecting
+    wait for reset to fall
+    start collecting again</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>coverpoint port iff (!bus_if.reset);
+
+<span class="c">// or, from the test</span>
+cg.stop();  @(negedge bus_if.reset);  cg.start();</code></pre></details></div>
+<p>For an enum, automatic bins are one per enum name, and auto_bin_max is ignored.</p>
+<p>A wildcard bin uses ? for a bit that can be 0 or 1. This splits a 3 bit dst into even and odd.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>even:  any value whose last bit is 0
+odd:   any value whose last bit is 1</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>coverpoint dst {
+  wildcard bins even = {3&#x27;b??0};
+  wildcard bins odd  = {3&#x27;b??1};
+}</code></pre></details></div>
+<p>Transition bins, ignore_bins and illegal_bins work as in Lecture 4.</p>
+<h3 id="step-12"><span class="stepno">Step 12</span>Cross coverage done well</h3>
+<p>If one point has M bins and the other has N, their cross has M × N bins. A 4 bit kind crossed with a 3 bit port gives 16 × 8 = 128 bins, most of them noise. Three tools fix that.</p>
+<figure class="fig"><svg viewBox="0 0 760 370" role="img" aria-label="Cross of kind bins and port values with ignored cells"><text x="328" y="24" font-size="16" text-anchor="middle" class="tm">port</text><text x="20" y="44" font-size="15" text-anchor="start" class="tm">kind bin</text><text x="146.0" y="52" font-size="15" text-anchor="middle" class="tm">0</text><text x="198.0" y="52" font-size="15" text-anchor="middle" class="tm">1</text><text x="250.0" y="52" font-size="15" text-anchor="middle" class="tm">2</text><text x="302.0" y="52" font-size="15" text-anchor="middle" class="tm">3</text><text x="354.0" y="52" font-size="15" text-anchor="middle" class="tm">4</text><text x="406.0" y="52" font-size="15" text-anchor="middle" class="tm">5</text><text x="458.0" y="52" font-size="15" text-anchor="middle" class="tm">6</text><text x="510.0" y="52" font-size="15" text-anchor="middle" class="tm">7</text><text x="110" y="81" font-size="15" text-anchor="end" class="tm">zero</text><rect x="120" y="60" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="60" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="60" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="60" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="60" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="60" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="60" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="60" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><text x="110" y="111" font-size="15" text-anchor="end" class="tm">lo</text><rect x="120" y="90" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="90" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="90" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="90" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="90" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="90" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="90" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="90" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><text x="110" y="141" font-size="15" text-anchor="end" class="tm">8</text><rect x="120" y="120" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="120" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="120" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="120" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="120" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="120" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="120" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="120" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><text x="110" y="171" font-size="15" text-anchor="end" class="tm">9</text><rect x="120" y="150" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="150" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="150" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="150" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="150" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="150" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="150" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="150" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><text x="110" y="201" font-size="15" text-anchor="end" class="tm">10</text><rect x="120" y="180" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="180" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="180" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="180" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="180" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="180" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="180" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="180" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><text x="110" y="231" font-size="15" text-anchor="end" class="tm">11</text><rect x="120" y="210" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="210" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="210" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="210" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="210" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="210" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="210" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="210" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><text x="110" y="261" font-size="15" text-anchor="end" class="tm">12</text><rect x="120" y="240" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="240" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="240" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="240" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="240" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="240" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="240" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="240" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><text x="110" y="291" font-size="15" text-anchor="end" class="tm">13</text><rect x="120" y="270" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="270" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="270" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="270" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="270" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="270" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="270" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="270" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><text x="110" y="321" font-size="15" text-anchor="end" class="tm">14</text><rect x="120" y="300" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="300" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="300" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="300" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="300" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="300" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="300" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="300" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><text x="110" y="351" font-size="15" text-anchor="end" class="tm">15</text><rect x="120" y="330" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="172" y="330" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="224" y="330" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="276" y="330" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="328" y="330" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="380" y="330" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="432" y="330" width="52" height="30" class="fillsoft" style="stroke:var(--bg);stroke-width:2"/><rect x="484" y="330" width="52" height="30" class="filldim" style="stroke:var(--bg);stroke-width:2"/><rect x="580" y="90" width="26" height="22" rx="3" class="fillsoft"/><text x="616" y="107" font-size="16" text-anchor="start">counted</text><rect x="580" y="126" width="26" height="22" rx="3" class="filldim"/><text x="616" y="143" font-size="16" text-anchor="start">ignored</text><text x="580" y="196" font-size="19" text-anchor="start" font-weight="700">60 of 80</text><text x="580" y="222" font-size="16" text-anchor="start" class="tm">cross bins left</text></svg><figcaption>The misc default bin is never part of a cross, so 10 kind bins times 8 ports gives 80. Three ignore rules remove 20 of them.</figcaption></figure>
+<ol>
+<li>Label the cover points and define bins on them, so the cross inherits readable names.</li>
+<li>Remove cross bins you do not care about with ignore_bins and binsof ... intersect.</li>
+<li>Set option.weight = 0 on a cover point to keep it out of the total score when only the cross matters.</li>
+</ol>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>port:  one bin per port value
+kind:  zero, lo (1 to 3), one bin for each of 8 to 15, misc
+
+watch every (kind, port) pair, but skip:
+    every pair where port is 7
+    pairs where port is 0 and kind is 9, 10 or 11
+    every pair where kind is in lo</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>covergroup CovPortKind;
+  port : coverpoint tr.port { bins port[] = {[0:$]}; }
+  kind : coverpoint tr.kind {
+    bins zero = {0};
+    bins lo   = {[1:3]};
+    bins hi[] = {[8:$]};
+    bins misc = default;
+  }
+  cross kind, port {
+    ignore_bins hi = binsof(port) intersect {7};
+    ignore_bins md = binsof(port) intersect {0} &amp;&amp; binsof(kind) intersect {[9:11]};
+    ignore_bins lo = binsof(kind.lo);
+  }
+endgroup</code></pre></details></div>
+<p>Read binsof(port) intersect {7} as every cross bin where port is 7.</p>
+<p>The slides also show two ways to cover just the useful combinations of two 1 bit signals a and b, namely a0b0, a1b0 and anything with b = 1.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>version 1, a cross:
+    a and b each have two bins and do not count on their own
+    count only three pairs:
+        a is 0 and b is 0
+        a is 1 and b is 0
+        b is 1, whatever a is
+
+version 2, one watcher on the 2 bit value {a, b}:
+    00,  10,  and any value ending in 1</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code><span class="c">// with a cross and named cross bins</span>
+a  : coverpoint tr.a { bins a0 = {0}; bins a1 = {1}; option.weight = 0; }
+b  : coverpoint tr.b { bins b0 = {0}; bins b1 = {1}; option.weight = 0; }
+ab : cross a, b {
+  bins a0b0 = binsof(a.a0) &amp;&amp; binsof(b.b0);
+  bins a1b0 = binsof(a.a1) &amp;&amp; binsof(b.b0);
+  bins b1   = binsof(b.b1);
+}
+
+<span class="c">// alternatively, one cover point on the concatenation {a, b}</span>
+coverpoint {tr.a, tr.b} {
+  bins a0b0 = {2&#x27;b00};
+  bins a1b0 = {2&#x27;b10};
+  wildcard bins b1 = {2&#x27;b?1};
+}</code></pre></details></div>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Running every simulation with the default seed.</li>
+<li>Counting coverage from runs that found a bug.</li>
+<li>An expression cover point that is too narrow and silently wraps.</li>
+<li>Leaving a big cross untrimmed, so the percentage stays tiny and means nothing.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>Two runs use the same seed and the same code. How do their coverage results compare?</div><details class="answer"><summary>Show answer</summary><div><p>They are identical, because the same seed repeats the same random values.</p></div></details></li>
+<li><div>Name the four kinds of code coverage, and give one bug that 100 percent code coverage would still miss.</div><details class="answer"><summary>Show answer</summary><div><p>Line, path, toggle and FSM. A feature that was never written, such as a missing error check, has no code to cover.</p></div></details></li>
+<li><div>A 3 bit dst has auto_bin_max = 4. List the bins.</div><details class="answer"><summary>Show answer</summary><div><p>&#91;0:1], [2:3], [4:5] and [6:7].</p></div></details></li>
+<li><div>hdr_len is 3 bits and payload_len is 3 bits. How many automatic bins does <code>coverpoint (hdr_len + payload_len)</code> get, and what goes wrong?</div><details class="answer"><summary>Show answer</summary><div><p>The sum is 3 bits wide, so only 8 bins exist and sums from 8 to 14 wrap around into the low bins. Add a 4'b0 to widen it.</p></div></details></li>
+<li><div>For <code>bins lo = {[1:3], 5}; bins hi[] = {[12:$]};</code> on a 4 bit kind, how many bins are created in total?</div><details class="answer"><summary>Show answer</summary><div><p>lo is 1 bin and hi[] is 4 bins for 12 to 15, so 5 in total.</p></div></details></li>
+<li><div>A 2 bit x is crossed with a 3 bit y, both with automatic bins. How many cross bins exist, and how many remain after <code>ignore_bins skip = binsof(y) intersect {0, 1};</code>?</div><details class="answer"><summary>Show answer</summary><div><p>4 × 8 = 32 cross bins. Removing y = 0 and y = 1 drops 2 × 4 = 8, leaving 24.</p></div></details></li>
+<li><div>Write a coverpoint on a 4 bit opcode with one bin for 0, one bin per value from 1 to 3, a bin for all even values from 4 to 15 using wildcards, and treat 15 as illegal.</div><details class="answer"><summary>Show answer</summary><div><p>One version is below. The illegal 15 is excluded even though the even wildcard does not match it anyway.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>watch opcode:
+    zero   0
+    low[]  1, 2 and 3, each its own bin
+    even   4, 6, 8, 10, 12, 14
+    bad    15 is illegal, an error if it ever shows up</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>coverpoint opcode {
+  bins zero    = {0};
+  bins low[]   = {[1:3]};
+  wildcard bins even = {4&#x27;b?1?0, 4&#x27;b1??0};   <span class="c">// 4, 6, 8, 10, 12, 14</span>
+  illegal_bins bad   = {15};
+}</code></pre></details></div></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="12-advanced-interfaces.html"><span class="dir">Previous</span>Lecture 12. Advanced Interfaces</a><a class="next" href="14-16-advanced-assertions.html"><span class="dir">Next</span>Lectures 14 to 16. Advanced Assertions</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

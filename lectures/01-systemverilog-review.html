@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 1. SystemVerilog Review | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lecture 1</span>SystemVerilog Review</h1><details class="toc"><summary>Steps in this lecture (11)</summary><ol><li><a href="#step-1">Running SystemVerilog in VCS</a></li><li><a href="#step-2">Four state versus two state types</a></li><li><a href="#step-3">The word reg does not mean register</a></li><li><a href="#step-4">Signed and unsigned</a></li><li><a href="#step-5">Small conveniences</a></li><li><a href="#step-6">typedef, struct and union</a></li><li><a href="#step-7">Unpacked arrays</a></li><li><a href="#step-8">Enumerated types</a></li><li><a href="#step-9">always_comb, always_ff and always_latch</a></li><li><a href="#step-10">Functions</a></li><li><a href="#step-11">Packed arrays</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">SystemVerilog is Verilog 2001 plus a large set of features for modeling and verification. It is the third generation of the language, after Verilog 1995 and Verilog 2001. This lecture covers the parts that matter before classes show up.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Running SystemVerilog in VCS</h3>
+<p>Files use the .sv extension. You compile with the -sverilog flag, then run the simulator executable.</p>
+<div class="cmd"><span class="label">Command</span><pre><code>vcs -sverilog design1.sv tbdesign1.sv
+./simv</code></pre></div>
+<h3 id="step-2"><span class="stepno">Step 2</span>Four state versus two state types</h3>
+<p>A four state type can hold 0, 1, X (unknown) or Z (high impedance, nothing driving it). A two state type can hold only 0 or 1.</p>
+<figure class="fig"><svg viewBox="0 0 760 210" role="img" aria-label="An X stored in a two state variable becomes 0"><rect x="20" y="65" width="190" height="80" rx="10" class="bx"/><text x="115.0" y="101.2" font-size="19" text-anchor="middle" font-weight="700">DUT output</text><text x="115.0" y="122.0" font-size="16" text-anchor="middle" class="tm">value is X</text><rect x="380" y="20" width="170" height="76" rx="10" class="bx"/><text x="465.0" y="54.2" font-size="19" text-anchor="middle" font-weight="700">logic q</text><text x="465.0" y="75.0" font-size="16" text-anchor="middle" class="tm">holds X</text><rect x="380" y="114" width="170" height="76" rx="10" class="bxw"/><text x="465.0" y="148.2" font-size="19" text-anchor="middle" font-weight="700">bit q</text><text x="465.0" y="169.1" font-size="16" text-anchor="middle" class="tm">becomes 0</text><path d="M210 105H300" class="ln"/><path d="M300 105V58H380" class="ln" marker-end="url(#ah)"/><path d="M300 105V152H380" class="ln" marker-end="url(#ah)"/><text x="566" y="52" font-size="17" text-anchor="start" class="tm">four state</text><text x="566" y="76" font-size="17" text-anchor="start">bug stays visible</text><text x="566" y="146" font-size="17" text-anchor="start" class="tm">two state</text><text x="566" y="170" font-size="17" text-anchor="start" class="tw">bug is hidden</text></svg><figcaption>A two state variable has no X, so an unknown value from the DUT silently becomes 0.</figcaption></figure>
+<ul>
+<li>Four state types are reg, logic, integer, wire, wor and wand. The type logic is identical to reg.</li>
+<li>Two state types are bit, byte, shortint, int and longint.</li>
+</ul>
+<p>Two state types simulate faster and use less memory. The catch is that an X from the DUT silently turns into 0 when stored in a two state variable, which can hide a real bug. Use logic for anything connected to the DUT.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>The word reg does not mean register</h3>
+<p>The slide declares two variables as reg. Only one becomes a flip flop, because the hardware depends on the block, not the keyword.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>make two 4 bit variables, sum and q_out
+
+whenever a or b changes:
+    sum becomes a + b           (just an adder, nothing is stored)
+
+at every rising clock edge:
+    q_out takes the value of d  (real flip flops, the value is stored)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>reg [3:0] sum, q_out;
+
+always_comb sum = a + b;            <span class="c">// combinational adder, no flip flops</span>
+
+always_ff @(posedge clk) q_out &lt;= d;  <span class="c">// real D flip flops</span></code></pre></details></div>
+<h3 id="step-4"><span class="stepno">Step 4</span>Signed and unsigned</h3>
+<p>The type logic is unsigned by default. The type int is 32 bit signed by default. You can override either one.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>b is an 8 bit number that can be negative
+d is a 32 bit number that can never be negative</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>logic signed [7:0] b;   <span class="c">// signed now</span>
+int unsigned d;         <span class="c">// 32 bit unsigned</span></code></pre></details></div>
+<h3 id="step-5"><span class="stepno">Step 5</span>Small conveniences</h3>
+<ol>
+<li>Fill every bit of a vector without knowing its width with '0, '1, 'x or 'z, as in <code>data = '1;</code>.</li>
+<li>Put direction and type right in the module header, as in <code>module simple (output logic a, b, input logic c, d);</code>.</li>
+<li>Increment and decrement work like C. With k equal to 5, <code>n = k++;</code> gives n equal to 5 and then k becomes 6. With <code>n = ++k;</code> k goes up first, so n gets the new value.</li>
+<li>Compound operators += , -= , *= and /= are shorthand, so <code>x += 2;</code> means <code>x = x + 2;</code>.</li>
+<li>A loop variable can live inside the loop, as in <code>for (int i = 0; i &lt; 8; i++)</code>. In Verilog it had to be declared outside.</li>
+</ol>
+<h3 id="step-6"><span class="stepno">Step 6</span>typedef, struct and union</h3>
+<p>A typedef gives a type a new name. Declared inside a module, it is visible only there. Declared outside any module, many modules can use it.</p>
+<figure class="fig"><svg viewBox="0 0 760 285" role="img" aria-label="Bit layout of a packed struct and a packed union"><text x="20" y="28" font-size="18" text-anchor="start" font-weight="700">Packed struct: one 13 bit vector</text><rect x="55" y="70" width="50" height="46" rx="0" class="bxa"/><rect x="105" y="70" width="50" height="46" rx="0" class="bxa"/><rect x="155" y="70" width="50" height="46" rx="0" class="bxa"/><rect x="205" y="70" width="50" height="46" rx="0" class="bxa"/><text x="155.0" y="58" font-size="19" text-anchor="middle" font-weight="700">a</text><rect x="255" y="70" width="50" height="46" rx="0" class="bxg"/><rect x="305" y="70" width="50" height="46" rx="0" class="bxg"/><rect x="355" y="70" width="50" height="46" rx="0" class="bxg"/><rect x="405" y="70" width="50" height="46" rx="0" class="bxg"/><rect x="455" y="70" width="50" height="46" rx="0" class="bxg"/><rect x="505" y="70" width="50" height="46" rx="0" class="bxg"/><rect x="555" y="70" width="50" height="46" rx="0" class="bxg"/><rect x="605" y="70" width="50" height="46" rx="0" class="bxg"/><text x="455.0" y="58" font-size="19" text-anchor="middle" font-weight="700">b</text><rect x="655" y="70" width="50" height="46" rx="0" class="bxw"/><text x="680.0" y="58" font-size="19" text-anchor="middle" font-weight="700">c</text><text x="80.0" y="142" font-size="15" text-anchor="middle" class="tm">12</text><text x="230.0" y="142" font-size="15" text-anchor="middle" class="tm">9</text><text x="280.0" y="142" font-size="15" text-anchor="middle" class="tm">8</text><text x="630.0" y="142" font-size="15" text-anchor="middle" class="tm">1</text><text x="680.0" y="142" font-size="15" text-anchor="middle" class="tm">0</text><text x="20" y="186" font-size="18" text-anchor="start" font-weight="700">Packed union: the same 4 bits, read two ways</text><rect x="60" y="206" width="60" height="52" rx="0" class="bx"/><text x="90" y="240" font-size="22" text-anchor="middle" font-weight="700">1</text><rect x="120" y="206" width="60" height="52" rx="0" class="bx"/><text x="150" y="240" font-size="22" text-anchor="middle" font-weight="700">1</text><rect x="180" y="206" width="60" height="52" rx="0" class="bx"/><text x="210" y="240" font-size="22" text-anchor="middle" font-weight="700">0</text><rect x="240" y="206" width="60" height="52" rx="0" class="bx"/><text x="270" y="240" font-size="22" text-anchor="middle" font-weight="700">1</text><path d="M300 232H330" class="ln"/><path d="M330 232V214H362" class="ln" marker-end="url(#ah)"/><path d="M330 232V256H362" class="ln" marker-end="url(#ah)"/><text x="372" y="220" font-size="17" text-anchor="start">read as u (unsigned): 8 + 4 + 1 = 13</text><text x="372" y="262" font-size="17" text-anchor="start">read as s (signed): -8 + 4 + 1 = -3</text></svg><figcaption>Top: the first field of a packed struct sits at the top bits, so a is bits 12 to 9. Bottom: a union stores one set of bits and lets you read it as unsigned or signed.</figcaption></figure>
+<p>A struct groups signals of different types, like a C struct. You read a field with dot notation.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>define a record type with fields:
+    a, b, c   single bits
+    d, e, f   integers
+    g, h      4 bit values
+
+make v of that type, filling the fields in order:
+    0, 1, 0, 5, 6, 7, A, B
+
+print field g of v      -&gt;  a</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>typedef struct {
+  logic a, b, c;
+  int d, e, f;
+  bit [3:0] g, h;
+} my_new_type;
+
+my_new_type v = &#x27;{1&#x27;b0, 1&#x27;b1, 1&#x27;b0, 5, 6, 7, 4&#x27;hA, 4&#x27;hB};
+initial $display(v.g);   <span class="c">// prints a</span></code></pre></details></div>
+<p>To pass a struct through a module port, put the typedef outside the module so both sides know the type.</p>
+<p>A packed struct stores all fields as one contiguous vector. The first field sits at the left, the most significant end, and the width is the sum of the field widths.</p>
+<p>A union is one piece of storage with more than one way to read it. Packed unions are synthesizable and unpacked ones are not. The slide example reads the same 4 bits as signed or unsigned.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>one 4 bit storage spot that can be read two ways:
+    u reads it as unsigned
+    s reads it as signed
+
+store 1101 through u
+print it both ways      -&gt;  s shows -3, u shows 13</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>union packed {
+  logic [3:0] u;
+  logic signed [3:0] s;
+} info;
+
+initial begin
+  info.u = 4&#x27;b1101;
+  $display(&quot;signed %0d unsigned %0d&quot;, info.s, info.u);  <span class="c">// -3 and 13</span>
+end</code></pre></details></div>
+<p>The bit pattern 1101 is 8 + 4 + 1 = 13 read as unsigned. Read as two's complement it is -8 + 4 + 1 = -3.</p>
+<h3 id="step-7"><span class="stepno">Step 7</span>Unpacked arrays</h3>
+<p>An unpacked array is a normal array of elements, written with the size after the name. Both declarations below make the same 16 by 8 by 4 array.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>arr   a 16 by 8 by 4 grid of integers
+arr2  the same grid, written with explicit index ranges
+b     2 rows of 4: row 0 is all 0, row 1 is all 1
+c     8 integers, every one equal to 5
+d     8 integers, every one set to 0 by default</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>int arr [16][8][4];
+int arr2 [0:15][0:7][0:3];
+
+int b [2][4] = &#x27;{&#x27;{0,0,0,0}, &#x27;{1,1,1,1}};  <span class="c">// array literal</span>
+int c [8]    = &#x27;{8{5}};                    <span class="c">// replication</span>
+int d [8]    = &#x27;{default: 0};              <span class="c">// every element 0</span></code></pre></details></div>
+<p>The '{ ... } form is called an array literal. Note the apostrophe in front of the brace.</p>
+<p>Loops get easier. $size returns the number of elements, and foreach walks every index for you. For more than one dimension, foreach puts all the indices in one bracket.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>m is a grid with 2 rows and 3 columns
+
+for every row i and column j of m:
+    m[i][j] = i * 3 + j        (fills in 0, 1, 2, 3, 4, 5)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>int m [2][3];
+foreach (m[i, j]) m[i][j] = i * 3 + j;</code></pre></details></div>
+<p>You can also build arrays of structs, and structs that contain arrays.</p>
+<h3 id="step-8"><span class="stepno">Step 8</span>Enumerated types</h3>
+<p>An enum lists the legal names for a variable. By default the names are stored as int values starting at 0, so the first name is 0, the second is 1, and so on. You can override the values.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>state_t may only be IDLE, BUSY or DONE   (stored as 0, 1, 2)
+color_t is 2 bits and may only be RED (01) or GREEN (10)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>typedef enum {IDLE, BUSY, DONE} state_t;        <span class="c">// 0, 1, 2</span>
+typedef enum logic [1:0] {RED = 2&#x27;b01, GREEN = 2&#x27;b10} color_t;</code></pre></details></div>
+<h3 id="step-9"><span class="stepno">Step 9</span>always_comb, always_ff and always_latch</h3>
+<p>In Verilog, one always block could make combinational logic, latches or flops, depending on easy to break rules. SystemVerilog splits it into three keywords that state your intent, so the tools can warn you when the code does not match.</p>
+<ol>
+<li>always_comb is for combinational logic. You give no sensitivity list, because the tool infers every input. It also runs once at time 0 so outputs start correct.</li>
+<li>always_ff is for edge triggered flops. You do give a sensitivity list, and every signal in it needs posedge or negedge.</li>
+<li>always_latch is for level sensitive latches. No sensitivity list, and an if with no else is expected here.</li>
+</ol>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>whenever any input changes:
+    if select is 1:  mux_out = in1
+    otherwise:       mux_out = in0
+
+at a rising clk, or the moment rst goes low:
+    if rst is low:   q = 0
+    otherwise:       q = d
+
+while clk is high:
+    q_lat follows d   (and holds still while clk is low)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>always_comb
+  if (select) mux_out = in1;
+  else        mux_out = in0;
+
+always_ff @(posedge clk or negedge rst)
+  if (!rst) q &lt;= 0;
+  else      q &lt;= d;
+
+always_latch
+  if (clk) q_lat &lt;= d;   <span class="c">// transparent while clk is high</span></code></pre></details></div>
+<h3 id="step-10"><span class="stepno">Step 10</span>Functions</h3>
+<p>A function with several statements no longer needs begin and end, and it uses blocking assignments. You can return a value with a return statement instead of assigning to the function name. A function may have several return statements, and it stops at the first one it reaches.</p>
+<p>A void function returns nothing and is called like a task. It still cannot wait on time or events, but it is synthesizable.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>function max2(a, b):
+    if a &gt; b:
+        give back a and stop
+    give back b</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>function int max2 (int a, int b);
+  if (a &gt; b) return a;
+  return b;
+endfunction</code></pre></details></div>
+<h3 id="step-11"><span class="stepno">Step 11</span>Packed arrays</h3>
+<p>A packed array has its dimensions before the name. It is stored as one contiguous vector, so <code>bit [3:0][7:0] word;</code> is 32 bits holding four bytes. Each range must be written out, like [3:0], not just a count.</p>
+<figure class="fig"><svg viewBox="0 0 760 285" role="img" aria-label="Unpacked array versus packed array"><text x="20" y="28" font-size="18" text-anchor="start" font-weight="700">Unpacked int b[4]: four separate elements</text><rect x="30" y="46" width="150" height="66" rx="10" class="bx"/><text x="105.0" y="75.2" font-size="19" text-anchor="middle" font-weight="700">b[0]</text><text x="105.0" y="96.0" font-size="16" text-anchor="middle" class="tm">32 bits</text><rect x="210" y="46" width="150" height="66" rx="10" class="bx"/><text x="285.0" y="75.2" font-size="19" text-anchor="middle" font-weight="700">b[1]</text><text x="285.0" y="96.0" font-size="16" text-anchor="middle" class="tm">32 bits</text><rect x="390" y="46" width="150" height="66" rx="10" class="bx"/><text x="465.0" y="75.2" font-size="19" text-anchor="middle" font-weight="700">b[2]</text><text x="465.0" y="96.0" font-size="16" text-anchor="middle" class="tm">32 bits</text><rect x="570" y="46" width="150" height="66" rx="10" class="bx"/><text x="645.0" y="75.2" font-size="19" text-anchor="middle" font-weight="700">b[3]</text><text x="645.0" y="96.0" font-size="16" text-anchor="middle" class="tm">32 bits</text><text x="20" y="160" font-size="18" text-anchor="start" font-weight="700">Packed bit [3:0][7:0] word: one 32 bit vector</text><rect x="30" y="178" width="172" height="66" rx="10" class="bxa"/><text x="116.0" y="207.2" font-size="19" text-anchor="middle" font-weight="700">word[3]</text><text x="116.0" y="228.1" font-size="16" text-anchor="middle" class="tm">8 bits</text><rect x="202" y="178" width="172" height="66" rx="10" class="bxa"/><text x="288.0" y="207.2" font-size="19" text-anchor="middle" font-weight="700">word[2]</text><text x="288.0" y="228.1" font-size="16" text-anchor="middle" class="tm">8 bits</text><rect x="374" y="178" width="172" height="66" rx="10" class="bxa"/><text x="460.0" y="207.2" font-size="19" text-anchor="middle" font-weight="700">word[1]</text><text x="460.0" y="228.1" font-size="16" text-anchor="middle" class="tm">8 bits</text><rect x="546" y="178" width="172" height="66" rx="10" class="bxa"/><text x="632.0" y="207.2" font-size="19" text-anchor="middle" font-weight="700">word[0]</text><text x="632.0" y="228.1" font-size="16" text-anchor="middle" class="tm">8 bits</text><text x="30" y="272" font-size="15" text-anchor="start" class="tm">bit 31</text><text x="718" y="272" font-size="15" text-anchor="end" class="tm">bit 0</text></svg><figcaption>Unpacked dimensions come after the name and give separate elements. Packed dimensions come before the name and give one contiguous vector.</figcaption></figure>
+<p>Only bit level types can be packed, meaning bit, logic, reg, wire, packed structs, packed unions and other packed arrays. You can set the whole thing, one bit, a part select (part of one dimension) or a slice (several whole sub fields).</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>word is 32 bits, seen as four bytes [3] [2] [1] [0]
+
+set all 32 bits to DEADBEEF
+clear byte 0, the lowest byte
+clear the top bit of byte 3
+set bytes 2 and 1 together to 1234</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>bit [3:0][7:0] word;
+word = 32&#x27;hDEAD_BEEF;   <span class="c">// whole array</span>
+word[0] = 8&#x27;h00;        <span class="c">// lowest byte</span>
+word[3][7] = 1&#x27;b0;      <span class="c">// one bit</span>
+word[2:1] = 16&#x27;h1234;   <span class="c">// a slice of two bytes</span></code></pre></details></div>
+<p>Copying one packed array to another works like a plain vector copy. Sizes do not have to match, and the usual Verilog rules truncate or zero pad the extra bits.</p>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Storing a DUT output in int or bit hides X values.</li>
+<li>Packed means dimensions before the name and one vector. Unpacked means dimensions after the name and separate elements.</li>
+<li>foreach over two dimensions is written m[i, j], not m[i][j].</li>
+<li>An if without else inside always_comb builds a latch by accident.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>Which of these can hold X, bit, logic, int or integer?</div><details class="answer"><summary>Show answer</summary><div><p>logic and integer. bit and int are two state.</p></div></details></li>
+<li><div>With k equal to 5, what are n and k after <code>n = k++;</code>? What are they if the line were <code>n = ++k;</code> instead?</div><details class="answer"><summary>Show answer</summary><div><p>With k++, n is 5 and k is 6. With ++k, k becomes 6 first, so n is 6 and k is 6.</p></div></details></li>
+<li><div>A variable is declared <code>int unsigned d;</code>. How many bits wide is it, and can it ever be negative?</div><details class="answer"><summary>Show answer</summary><div><p>It is 32 bits and never negative.</p></div></details></li>
+<li><div>Write a foreach loop that prints every element of <code>int m [2][3];</code>.</div><details class="answer"><summary>Show answer</summary><div><p><code>foreach (m[i, j]) $display("m[%0d][%0d] = %0d", i, j, m[i][j]);</code></p></div></details></li>
+<li><div>A union has <code>logic [3:0] u</code> and <code>logic signed [3:0] s</code>. If u is 4'b1110, what value does s read?</div><details class="answer"><summary>Show answer</summary><div><p>1110 is -8 + 4 + 2, so s reads -2.</p></div></details></li>
+<li><div>A packed struct holds <code>logic [3:0] a; logic [7:0] b; logic c;</code> in that order. How wide is it, and which bit range holds a?</div><details class="answer"><summary>Show answer</summary><div><p>It is 4 + 8 + 1 = 13 bits. The first field sits at the top, so a is bits [12:9].</p></div></details></li>
+<li><div>Someone writes <code>always_comb if (en) y = x;</code> with no else. What does synthesis build and why will the tool complain?</div><details class="answer"><summary>Show answer</summary><div><p>It builds a latch, because y must hold its old value when en is 0. always_comb promised no storage, so the tool warns.</p></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><span style="flex:1"></span><a class="next" href="02-oop.html"><span class="dir">Next</span>Lecture 2. OOP in SystemVerilog</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 4. Functional Coverage Basics | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lecture 4</span>Functional Coverage Basics</h1><details class="toc"><summary>Steps in this lecture (10)</summary><ol><li><a href="#step-1">Cover points and bins</a></li><li><a href="#step-2">Cover groups</a></li><li><a href="#step-3">When does sampling happen</a></li><li><a href="#step-4">Automatic bins</a></li><li><a href="#step-5">Explicit bins</a></li><li><a href="#step-6">Transition bins</a></li><li><a href="#step-7">ignore_bins and illegal_bins</a></li><li><a href="#step-8">Cross coverage</a></li><li><a href="#step-9">Cover group methods</a></li><li><a href="#step-10">What can be covered, and filters</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">Random stimulus raises an obvious question, which is what did it actually test. Functional coverage answers it by recording which values your signals took and reporting the ones never seen.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Cover points and bins</h3>
+<p>A cover point is one value you watch, such as a 4 bit variable x. A 4 bit value has 16 possible values, and you want to see all of them during simulation.</p>
+<p>The possible values are split into bins. A bin holds one value or a range of values. Each time the sampled value falls in a bin, that bin gets a hit.</p>
+<p>Coverage is the percent of bins with at least one hit. The goal is 100 percent.</p>
+<h3 id="step-2"><span class="stepno">Step 2</span>Cover groups</h3>
+<p>A covergroup collects cover points that are sampled at the same moment. It behaves a lot like a class.</p>
+<ul>
+<li>You define it once and create instances with new. No instance means no data.</li>
+<li>Every cover point inside is sampled together.</li>
+<li>You can define it in a program, a module or a class.</li>
+</ul>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>covergroup grp:
+    watch x, and call this watcher cpx in the report
+
+build one copy of it, named grp1</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>covergroup grp;
+  cpx : coverpoint x;     <span class="c">// cpx is a label for the report</span>
+endgroup
+
+grp grp1 = new();</code></pre></details></div>
+<p>If you skip the label, the tool invents a generic name such as coverpoint_0.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>When does sampling happen</h3>
+<p>There are two ways to trigger a covergroup.</p>
+<ol>
+<li>Call sample() yourself, as in grp1.sample(), right after new values are ready.</li>
+<li>Put an event in the definition, as in <code>covergroup cg @(posedge clk);</code>, and it samples on every clock edge.</li>
+</ol>
+<h3 id="step-4"><span class="stepno">Step 4</span>Automatic bins</h3>
+<p>With no bins written, the tool makes one bin per value, up to a limit called auto_bin_max. The default is 64. If the variable has more values than that, each bin covers an equal range.</p>
+<figure class="fig"><svg viewBox="0 0 760 225" role="img" aria-label="Automatic bins with auto_bin_max set to 8"><text x="48" y="68" font-size="15" text-anchor="end" class="tm">value</text><text x="48" y="136" font-size="15" text-anchor="end" class="tm">bin</text><rect x="56" y="40" width="42" height="44" rx="0" class="bx"/><text x="77.0" y="68" font-size="16" text-anchor="middle">0</text><rect x="98" y="40" width="42" height="44" rx="0" class="bx"/><text x="119.0" y="68" font-size="16" text-anchor="middle">1</text><rect x="140" y="40" width="42" height="44" rx="0" class="bx"/><text x="161.0" y="68" font-size="16" text-anchor="middle">2</text><rect x="182" y="40" width="42" height="44" rx="0" class="bx"/><text x="203.0" y="68" font-size="16" text-anchor="middle">3</text><rect x="224" y="40" width="42" height="44" rx="0" class="bx"/><text x="245.0" y="68" font-size="16" text-anchor="middle">4</text><rect x="266" y="40" width="42" height="44" rx="0" class="bx"/><text x="287.0" y="68" font-size="16" text-anchor="middle">5</text><rect x="308" y="40" width="42" height="44" rx="0" class="bx"/><text x="329.0" y="68" font-size="16" text-anchor="middle">6</text><rect x="350" y="40" width="42" height="44" rx="0" class="bx"/><text x="371.0" y="68" font-size="16" text-anchor="middle">7</text><rect x="392" y="40" width="42" height="44" rx="0" class="bx"/><text x="413.0" y="68" font-size="16" text-anchor="middle">8</text><rect x="434" y="40" width="42" height="44" rx="0" class="bx"/><text x="455.0" y="68" font-size="16" text-anchor="middle">9</text><rect x="476" y="40" width="42" height="44" rx="0" class="bxa"/><text x="497.0" y="68" font-size="16" text-anchor="middle">10</text><rect x="518" y="40" width="42" height="44" rx="0" class="bxa"/><text x="539.0" y="68" font-size="16" text-anchor="middle">11</text><rect x="560" y="40" width="42" height="44" rx="0" class="bxa"/><text x="581.0" y="68" font-size="16" text-anchor="middle">12</text><rect x="602" y="40" width="42" height="44" rx="0" class="bx"/><text x="623.0" y="68" font-size="16" text-anchor="middle">13</text><rect x="644" y="40" width="42" height="44" rx="0" class="bxa"/><text x="665.0" y="68" font-size="16" text-anchor="middle">14</text><rect x="686" y="40" width="42" height="44" rx="0" class="bx"/><text x="707.0" y="68" font-size="16" text-anchor="middle">15</text><rect x="59" y="108" width="78" height="42" rx="8" class="bx"/><text x="98" y="174" font-size="14" text-anchor="middle" class="tm">[0:1]</text><rect x="143" y="108" width="78" height="42" rx="8" class="bx"/><text x="182" y="174" font-size="14" text-anchor="middle" class="tm">[2:3]</text><rect x="227" y="108" width="78" height="42" rx="8" class="bx"/><text x="266" y="174" font-size="14" text-anchor="middle" class="tm">[4:5]</text><rect x="311" y="108" width="78" height="42" rx="8" class="bx"/><text x="350" y="174" font-size="14" text-anchor="middle" class="tm">[6:7]</text><rect x="395" y="108" width="78" height="42" rx="8" class="bx"/><text x="434" y="174" font-size="14" text-anchor="middle" class="tm">[8:9]</text><rect x="479" y="108" width="78" height="42" rx="8" class="bxg"/><text x="518" y="135" font-size="16" text-anchor="middle">hit</text><text x="518" y="174" font-size="14" text-anchor="middle" class="tm">[10:11]</text><rect x="563" y="108" width="78" height="42" rx="8" class="bxg"/><text x="602" y="135" font-size="16" text-anchor="middle">hit</text><text x="602" y="174" font-size="14" text-anchor="middle" class="tm">[12:13]</text><rect x="647" y="108" width="78" height="42" rx="8" class="bxg"/><text x="686" y="135" font-size="16" text-anchor="middle">hit</text><text x="686" y="174" font-size="14" text-anchor="middle" class="tm">[14:15]</text><text x="56" y="210" font-size="18" text-anchor="start" font-weight="700">3 of 8 bins hit, 37.5 percent</text></svg><figcaption>Shaded values are the four samples. Each bin covers two values and counts as hit if any of its values appeared.</figcaption></figure>
+<p>For a 10 bit value, 1024 values over 64 bins gives 16 values per bin, [0:15], [16:31] and so on. A bin counts as hit if any one of its values is seen.</p>
+<p>The slide example sets auto_bin_max to 8 for a 4 bit x, so each bin holds 2 values.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>x is 4 bits. The test values are 10, 11, 12, 14
+
+covergroup grp:
+    watch x as cpx, with at most 8 automatic bins (2 values per bin)
+
+for each test value:
+    x = that value
+    take a coverage snapshot
+
+-&gt;  bins [10:11], [12:13], [14:15] are hit
+-&gt;  3 of 8 bins covered</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>bit [3:0] x;
+bit [3:0] xvals[4] = &#x27;{10, 11, 12, 14};
+
+covergroup grp;
+  cpx : coverpoint x { option.auto_bin_max = 8; }
+endgroup
+
+grp grp1 = new();
+initial foreach (xvals[i]) begin
+  x = xvals[i];
+  grp1.sample();
+end</code></pre></details></div>
+<ol>
+<li>Bin [10:11] is hit twice, by 10 and 11.</li>
+<li>Bin [12:13] is hit once, by 12.</li>
+<li>Bin [14:15] is hit once, by 14.</li>
+<li>So 3 of 8 bins are covered, which is 37.5 percent.</li>
+</ol>
+<h3 id="step-5"><span class="stepno">Step 5</span>Explicit bins</h3>
+<p>You can name bins and list their values yourself with the bins keyword. A default bin catches every value you did not list.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>watch x with three named bins:
+    low    0 to 3
+    mid    4, 5, 6, 7
+    high   8 to 15</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>cpx : coverpoint x {
+  bins low  = {[0:3]};
+  bins mid  = {4, 5, 6, 7};
+  bins high = {[8:15]};
+}</code></pre></details></div>
+<p>The slide example has 3 named bins and all 3 get hit, so coverage is 100 percent even though most of the 16 values never appeared. Coverage only judges the bins you defined.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>Transition bins</h3>
+<p>A transition bin checks that a value is followed directly by another value on the next sample. The syntax uses =&gt;.</p>
+<figure class="fig"><svg viewBox="0 0 760 195" role="img" aria-label="Transition bins on the sequence 7, 8, 9, 7"><circle cx="110" cy="70" r="34" class="bx"/><text x="110" y="78" font-size="24" text-anchor="middle" font-weight="700">7</text><circle cx="290" cy="70" r="34" class="bx"/><text x="290" y="78" font-size="24" text-anchor="middle" font-weight="700">8</text><circle cx="470" cy="70" r="34" class="bx"/><text x="470" y="78" font-size="24" text-anchor="middle" font-weight="700">9</text><circle cx="650" cy="70" r="34" class="bx"/><text x="650" y="78" font-size="24" text-anchor="middle" font-weight="700">7</text><path d="M144 70H254" class="ln" marker-end="url(#ah)"/><path d="M324 70H434" class="ln" marker-end="url(#ah)"/><path d="M504 70H614" class="lna" marker-end="url(#aha)"/><text x="200" y="126" font-size="16" text-anchor="middle" class="tm">7 then 8</text><text x="380" y="126" font-size="16" text-anchor="middle" class="tm">8 then 9</text><text x="560" y="126" font-size="17" text-anchor="middle" class="ta" font-weight="700">9 then 7: hit</text><text x="380" y="176" font-size="16" text-anchor="middle" class="tm">7 is never followed directly by 9, so from_7_to_9 stays empty</text></svg><figcaption>A transition bin needs the two values on back to back samples.</figcaption></figure>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the values arrive in this order: 7, 8, 9, 7
+
+bin from_7_to_9   hit only if 9 comes RIGHT after 7
+bin from_9_to_7   hit only if 7 comes RIGHT after 9
+
+-&gt;  9 then 7 happens, 7 then 9 never does
+-&gt;  1 of 2 bins covered</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>bit [3:0] xvals[4] = &#x27;{7, 8, 9, 7};
+
+cpx : coverpoint x {
+  bins from_7_to_9 = (7 =&gt; 9);
+  bins from_9_to_7 = (9 =&gt; 7);
+}</code></pre></details></div>
+<p>The sequence is 7, 8, 9, 7. The bin 7 =&gt; 9 is not hit, because 8 came in between. The bin 9 =&gt; 7 is hit once. So 1 of 2 bins is covered.</p>
+<h3 id="step-7"><span class="stepno">Step 7</span>ignore_bins and illegal_bins</h3>
+<p>ignore_bins removes values you do not care about, such as impossible ones. They get no bins and do not count toward the percentage.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the values are 4, 8, 10, 12
+
+ignore 12, 13, 14 and 15 completely
+-&gt;  12 automatic bins remain, and 4, 8, 10 hit 3 of them</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>bit [3:0] xvals[4] = &#x27;{4, 8, 10, 12};
+cpx : coverpoint x { ignore_bins skip = {12, 13, 14, 15}; }</code></pre></details></div>
+<p>That leaves 12 automatic bins. Values 4, 8 and 10 hit their bins, and 12 is ignored. So 3 of 12 bins are covered, 25 percent.</p>
+<p>illegal_bins marks values that should never happen. Seeing one is reported as a run time error, and on the slide the simulation stops there. Illegal values are also left out of the percentage.</p>
+<p>The slide example has values 11, 12, 13, 14 sampled. With 15 marked illegal, 15 values remain and 4 are hit, giving 4/15 = 26.67 percent. If 14 were also illegal, sampling 14 would end the run with an error.</p>
+<h3 id="step-8"><span class="stepno">Step 8</span>Cross coverage</h3>
+<p>Cross coverage checks combinations of two cover points sampled at the same time. Give each cover point a label, then cross the labels.</p>
+<figure class="fig"><svg viewBox="0 0 760 440" role="img" aria-label="Cross coverage grid of 16 by 16 bins with four hits"><rect x="70" y="355" width="21" height="21" class="grid"/><rect x="70" y="334" width="21" height="21" class="grid"/><rect x="70" y="313" width="21" height="21" class="grid"/><rect x="70" y="292" width="21" height="21" class="grid"/><rect x="70" y="271" width="21" height="21" class="grid"/><rect x="70" y="250" width="21" height="21" class="grid"/><rect x="70" y="229" width="21" height="21" class="grid"/><rect x="70" y="208" width="21" height="21" class="grid"/><rect x="70" y="187" width="21" height="21" class="grid"/><rect x="70" y="166" width="21" height="21" class="grid"/><rect x="70" y="145" width="21" height="21" class="grid"/><rect x="70" y="124" width="21" height="21" class="grid"/><rect x="70" y="103" width="21" height="21" class="grid"/><rect x="70" y="82" width="21" height="21" class="grid"/><rect x="70" y="61" width="21" height="21" class="grid"/><rect x="70" y="40" width="21" height="21" class="grid"/><rect x="91" y="355" width="21" height="21" class="grid"/><rect x="91" y="334" width="21" height="21" class="grid"/><rect x="91" y="313" width="21" height="21" class="grid"/><rect x="91" y="292" width="21" height="21" class="grid"/><rect x="91" y="271" width="21" height="21" class="grid"/><rect x="91" y="250" width="21" height="21" class="grid"/><rect x="91" y="229" width="21" height="21" class="grid"/><rect x="91" y="208" width="21" height="21" class="grid"/><rect x="91" y="187" width="21" height="21" class="filla"/><rect x="91" y="166" width="21" height="21" class="grid"/><rect x="91" y="145" width="21" height="21" class="grid"/><rect x="91" y="124" width="21" height="21" class="grid"/><rect x="91" y="103" width="21" height="21" class="grid"/><rect x="91" y="82" width="21" height="21" class="grid"/><rect x="91" y="61" width="21" height="21" class="grid"/><rect x="91" y="40" width="21" height="21" class="grid"/><rect x="112" y="355" width="21" height="21" class="grid"/><rect x="112" y="334" width="21" height="21" class="grid"/><rect x="112" y="313" width="21" height="21" class="grid"/><rect x="112" y="292" width="21" height="21" class="grid"/><rect x="112" y="271" width="21" height="21" class="grid"/><rect x="112" y="250" width="21" height="21" class="grid"/><rect x="112" y="229" width="21" height="21" class="grid"/><rect x="112" y="208" width="21" height="21" class="grid"/><rect x="112" y="187" width="21" height="21" class="grid"/><rect x="112" y="166" width="21" height="21" class="grid"/><rect x="112" y="145" width="21" height="21" class="grid"/><rect x="112" y="124" width="21" height="21" class="grid"/><rect x="112" y="103" width="21" height="21" class="grid"/><rect x="112" y="82" width="21" height="21" class="grid"/><rect x="112" y="61" width="21" height="21" class="grid"/><rect x="112" y="40" width="21" height="21" class="grid"/><rect x="133" y="355" width="21" height="21" class="grid"/><rect x="133" y="334" width="21" height="21" class="grid"/><rect x="133" y="313" width="21" height="21" class="grid"/><rect x="133" y="292" width="21" height="21" class="grid"/><rect x="133" y="271" width="21" height="21" class="grid"/><rect x="133" y="250" width="21" height="21" class="grid"/><rect x="133" y="229" width="21" height="21" class="grid"/><rect x="133" y="208" width="21" height="21" class="grid"/><rect x="133" y="187" width="21" height="21" class="grid"/><rect x="133" y="166" width="21" height="21" class="grid"/><rect x="133" y="145" width="21" height="21" class="filla"/><rect x="133" y="124" width="21" height="21" class="grid"/><rect x="133" y="103" width="21" height="21" class="grid"/><rect x="133" y="82" width="21" height="21" class="grid"/><rect x="133" y="61" width="21" height="21" class="grid"/><rect x="133" y="40" width="21" height="21" class="grid"/><rect x="154" y="355" width="21" height="21" class="grid"/><rect x="154" y="334" width="21" height="21" class="grid"/><rect x="154" y="313" width="21" height="21" class="grid"/><rect x="154" y="292" width="21" height="21" class="grid"/><rect x="154" y="271" width="21" height="21" class="grid"/><rect x="154" y="250" width="21" height="21" class="grid"/><rect x="154" y="229" width="21" height="21" class="grid"/><rect x="154" y="208" width="21" height="21" class="grid"/><rect x="154" y="187" width="21" height="21" class="grid"/><rect x="154" y="166" width="21" height="21" class="grid"/><rect x="154" y="145" width="21" height="21" class="grid"/><rect x="154" y="124" width="21" height="21" class="grid"/><rect x="154" y="103" width="21" height="21" class="grid"/><rect x="154" y="82" width="21" height="21" class="grid"/><rect x="154" y="61" width="21" height="21" class="grid"/><rect x="154" y="40" width="21" height="21" class="grid"/><rect x="175" y="355" width="21" height="21" class="grid"/><rect x="175" y="334" width="21" height="21" class="grid"/><rect x="175" y="313" width="21" height="21" class="grid"/><rect x="175" y="292" width="21" height="21" class="grid"/><rect x="175" y="271" width="21" height="21" class="grid"/><rect x="175" y="250" width="21" height="21" class="grid"/><rect x="175" y="229" width="21" height="21" class="grid"/><rect x="175" y="208" width="21" height="21" class="grid"/><rect x="175" y="187" width="21" height="21" class="grid"/><rect x="175" y="166" width="21" height="21" class="grid"/><rect x="175" y="145" width="21" height="21" class="grid"/><rect x="175" y="124" width="21" height="21" class="grid"/><rect x="175" y="103" width="21" height="21" class="filla"/><rect x="175" y="82" width="21" height="21" class="grid"/><rect x="175" y="61" width="21" height="21" class="grid"/><rect x="175" y="40" width="21" height="21" class="grid"/><rect x="196" y="355" width="21" height="21" class="grid"/><rect x="196" y="334" width="21" height="21" class="grid"/><rect x="196" y="313" width="21" height="21" class="grid"/><rect x="196" y="292" width="21" height="21" class="grid"/><rect x="196" y="271" width="21" height="21" class="grid"/><rect x="196" y="250" width="21" height="21" class="grid"/><rect x="196" y="229" width="21" height="21" class="grid"/><rect x="196" y="208" width="21" height="21" class="grid"/><rect x="196" y="187" width="21" height="21" class="grid"/><rect x="196" y="166" width="21" height="21" class="grid"/><rect x="196" y="145" width="21" height="21" class="grid"/><rect x="196" y="124" width="21" height="21" class="grid"/><rect x="196" y="103" width="21" height="21" class="grid"/><rect x="196" y="82" width="21" height="21" class="grid"/><rect x="196" y="61" width="21" height="21" class="grid"/><rect x="196" y="40" width="21" height="21" class="grid"/><rect x="217" y="355" width="21" height="21" class="grid"/><rect x="217" y="334" width="21" height="21" class="grid"/><rect x="217" y="313" width="21" height="21" class="grid"/><rect x="217" y="292" width="21" height="21" class="grid"/><rect x="217" y="271" width="21" height="21" class="grid"/><rect x="217" y="250" width="21" height="21" class="grid"/><rect x="217" y="229" width="21" height="21" class="grid"/><rect x="217" y="208" width="21" height="21" class="grid"/><rect x="217" y="187" width="21" height="21" class="grid"/><rect x="217" y="166" width="21" height="21" class="grid"/><rect x="217" y="145" width="21" height="21" class="grid"/><rect x="217" y="124" width="21" height="21" class="grid"/><rect x="217" y="103" width="21" height="21" class="grid"/><rect x="217" y="82" width="21" height="21" class="grid"/><rect x="217" y="61" width="21" height="21" class="filla"/><rect x="217" y="40" width="21" height="21" class="grid"/><rect x="238" y="355" width="21" height="21" class="grid"/><rect x="238" y="334" width="21" height="21" class="grid"/><rect x="238" y="313" width="21" height="21" class="grid"/><rect x="238" y="292" width="21" height="21" class="grid"/><rect x="238" y="271" width="21" height="21" class="grid"/><rect x="238" y="250" width="21" height="21" class="grid"/><rect x="238" y="229" width="21" height="21" class="grid"/><rect x="238" y="208" width="21" height="21" class="grid"/><rect x="238" y="187" width="21" height="21" class="grid"/><rect x="238" y="166" width="21" height="21" class="grid"/><rect x="238" y="145" width="21" height="21" class="grid"/><rect x="238" y="124" width="21" height="21" class="grid"/><rect x="238" y="103" width="21" height="21" class="grid"/><rect x="238" y="82" width="21" height="21" class="grid"/><rect x="238" y="61" width="21" height="21" class="grid"/><rect x="238" y="40" width="21" height="21" class="grid"/><rect x="259" y="355" width="21" height="21" class="grid"/><rect x="259" y="334" width="21" height="21" class="grid"/><rect x="259" y="313" width="21" height="21" class="grid"/><rect x="259" y="292" width="21" height="21" class="grid"/><rect x="259" y="271" width="21" height="21" class="grid"/><rect x="259" y="250" width="21" height="21" class="grid"/><rect x="259" y="229" width="21" height="21" class="grid"/><rect x="259" y="208" width="21" height="21" class="grid"/><rect x="259" y="187" width="21" height="21" class="grid"/><rect x="259" y="166" width="21" height="21" class="grid"/><rect x="259" y="145" width="21" height="21" class="grid"/><rect x="259" y="124" width="21" height="21" class="grid"/><rect x="259" y="103" width="21" height="21" class="grid"/><rect x="259" y="82" width="21" height="21" class="grid"/><rect x="259" y="61" width="21" height="21" class="grid"/><rect x="259" y="40" width="21" height="21" class="grid"/><rect x="280" y="355" width="21" height="21" class="grid"/><rect x="280" y="334" width="21" height="21" class="grid"/><rect x="280" y="313" width="21" height="21" class="grid"/><rect x="280" y="292" width="21" height="21" class="grid"/><rect x="280" y="271" width="21" height="21" class="grid"/><rect x="280" y="250" width="21" height="21" class="grid"/><rect x="280" y="229" width="21" height="21" class="grid"/><rect x="280" y="208" width="21" height="21" class="grid"/><rect x="280" y="187" width="21" height="21" class="grid"/><rect x="280" y="166" width="21" height="21" class="grid"/><rect x="280" y="145" width="21" height="21" class="grid"/><rect x="280" y="124" width="21" height="21" class="grid"/><rect x="280" y="103" width="21" height="21" class="grid"/><rect x="280" y="82" width="21" height="21" class="grid"/><rect x="280" y="61" width="21" height="21" class="grid"/><rect x="280" y="40" width="21" height="21" class="grid"/><rect x="301" y="355" width="21" height="21" class="grid"/><rect x="301" y="334" width="21" height="21" class="grid"/><rect x="301" y="313" width="21" height="21" class="grid"/><rect x="301" y="292" width="21" height="21" class="grid"/><rect x="301" y="271" width="21" height="21" class="grid"/><rect x="301" y="250" width="21" height="21" class="grid"/><rect x="301" y="229" width="21" height="21" class="grid"/><rect x="301" y="208" width="21" height="21" class="grid"/><rect x="301" y="187" width="21" height="21" class="grid"/><rect x="301" y="166" width="21" height="21" class="grid"/><rect x="301" y="145" width="21" height="21" class="grid"/><rect x="301" y="124" width="21" height="21" class="grid"/><rect x="301" y="103" width="21" height="21" class="grid"/><rect x="301" y="82" width="21" height="21" class="grid"/><rect x="301" y="61" width="21" height="21" class="grid"/><rect x="301" y="40" width="21" height="21" class="grid"/><rect x="322" y="355" width="21" height="21" class="grid"/><rect x="322" y="334" width="21" height="21" class="grid"/><rect x="322" y="313" width="21" height="21" class="grid"/><rect x="322" y="292" width="21" height="21" class="grid"/><rect x="322" y="271" width="21" height="21" class="grid"/><rect x="322" y="250" width="21" height="21" class="grid"/><rect x="322" y="229" width="21" height="21" class="grid"/><rect x="322" y="208" width="21" height="21" class="grid"/><rect x="322" y="187" width="21" height="21" class="grid"/><rect x="322" y="166" width="21" height="21" class="grid"/><rect x="322" y="145" width="21" height="21" class="grid"/><rect x="322" y="124" width="21" height="21" class="grid"/><rect x="322" y="103" width="21" height="21" class="grid"/><rect x="322" y="82" width="21" height="21" class="grid"/><rect x="322" y="61" width="21" height="21" class="grid"/><rect x="322" y="40" width="21" height="21" class="grid"/><rect x="343" y="355" width="21" height="21" class="grid"/><rect x="343" y="334" width="21" height="21" class="grid"/><rect x="343" y="313" width="21" height="21" class="grid"/><rect x="343" y="292" width="21" height="21" class="grid"/><rect x="343" y="271" width="21" height="21" class="grid"/><rect x="343" y="250" width="21" height="21" class="grid"/><rect x="343" y="229" width="21" height="21" class="grid"/><rect x="343" y="208" width="21" height="21" class="grid"/><rect x="343" y="187" width="21" height="21" class="grid"/><rect x="343" y="166" width="21" height="21" class="grid"/><rect x="343" y="145" width="21" height="21" class="grid"/><rect x="343" y="124" width="21" height="21" class="grid"/><rect x="343" y="103" width="21" height="21" class="grid"/><rect x="343" y="82" width="21" height="21" class="grid"/><rect x="343" y="61" width="21" height="21" class="grid"/><rect x="343" y="40" width="21" height="21" class="grid"/><rect x="364" y="355" width="21" height="21" class="grid"/><rect x="364" y="334" width="21" height="21" class="grid"/><rect x="364" y="313" width="21" height="21" class="grid"/><rect x="364" y="292" width="21" height="21" class="grid"/><rect x="364" y="271" width="21" height="21" class="grid"/><rect x="364" y="250" width="21" height="21" class="grid"/><rect x="364" y="229" width="21" height="21" class="grid"/><rect x="364" y="208" width="21" height="21" class="grid"/><rect x="364" y="187" width="21" height="21" class="grid"/><rect x="364" y="166" width="21" height="21" class="grid"/><rect x="364" y="145" width="21" height="21" class="grid"/><rect x="364" y="124" width="21" height="21" class="grid"/><rect x="364" y="103" width="21" height="21" class="grid"/><rect x="364" y="82" width="21" height="21" class="grid"/><rect x="364" y="61" width="21" height="21" class="grid"/><rect x="364" y="40" width="21" height="21" class="grid"/><rect x="385" y="355" width="21" height="21" class="grid"/><rect x="385" y="334" width="21" height="21" class="grid"/><rect x="385" y="313" width="21" height="21" class="grid"/><rect x="385" y="292" width="21" height="21" class="grid"/><rect x="385" y="271" width="21" height="21" class="grid"/><rect x="385" y="250" width="21" height="21" class="grid"/><rect x="385" y="229" width="21" height="21" class="grid"/><rect x="385" y="208" width="21" height="21" class="grid"/><rect x="385" y="187" width="21" height="21" class="grid"/><rect x="385" y="166" width="21" height="21" class="grid"/><rect x="385" y="145" width="21" height="21" class="grid"/><rect x="385" y="124" width="21" height="21" class="grid"/><rect x="385" y="103" width="21" height="21" class="grid"/><rect x="385" y="82" width="21" height="21" class="grid"/><rect x="385" y="61" width="21" height="21" class="grid"/><rect x="385" y="40" width="21" height="21" class="grid"/><text x="70" y="400" font-size="15" text-anchor="middle" class="tm">0</text><text x="406" y="400" font-size="15" text-anchor="middle" class="tm">15</text><text x="238" y="426" font-size="16" text-anchor="middle" class="tm">x value</text><text x="58" y="376" font-size="15" text-anchor="end" class="tm">0</text><text x="58" y="52" font-size="15" text-anchor="end" class="tm">15</text><text x="58" y="208" font-size="16" text-anchor="end" class="tm">y</text><text x="450" y="110" font-size="18" text-anchor="start">cpx: 4 of 16 bins</text><text x="450" y="150" font-size="18" text-anchor="start">cpy: 4 of 16 bins</text><text x="450" y="190" font-size="18" text-anchor="start" font-weight="700">cpxy: 4 of 256 bins</text><text x="450" y="224" font-size="17" text-anchor="start" class="tw">only 1.56 percent</text></svg><figcaption>Each square is one (x, y) combination. Four samples fill four squares out of 256.</figcaption></figure>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>covergroup grp:
+    watch x as cpx
+    watch y as cpy
+    cpxy: watch every (x bin, y bin) pair</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>covergroup grp;
+  cpx  : coverpoint x;
+  cpy  : coverpoint y;
+  cpxy : cross cpx, cpy;
+endgroup</code></pre></details></div>
+<p>The slide drives four (x, y) pairs, (1, 8), (3, 10), (5, 12) and (7, 14).</p>
+<ol>
+<li>cpx has 16 bins and 4 hit, so 25 percent.</li>
+<li>cpy has 16 bins and 4 hit, so 25 percent.</li>
+<li>cpxy has 16 × 16 = 256 combination bins and 4 hit, so 1.56 percent.</li>
+</ol>
+<p>Crosses grow fast, which is why later lectures teach you to trim them.</p>
+<h3 id="step-9"><span class="stepno">Step 9</span>Cover group methods</h3>
+<ul>
+<li>sample() takes one snapshot. Think of it as taking a photo.</li>
+<li>start() and stop() turn collection on and off. Think of them as turning the camera on and off.</li>
+</ul>
+<p>All three act on the whole covergroup, never on one cover point. A common use is calling stop() during reset, when values are meaningless, and start() afterward.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>covergroup DrivingGroup takes a snapshot of speed at every rising clk
+
+build dg, which starts collecting right away
+turn collecting OFF
+wait until reset ends (rst falls)
+turn collecting back ON</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>covergroup DrivingGroup @(posedge clk);
+  coverpoint speed;
+endgroup
+
+DrivingGroup dg = new();   <span class="c">// active by default</span>
+initial begin
+  dg.stop();               <span class="c">// ignore the reset phase</span>
+  @(negedge rst);
+  dg.start();
+end</code></pre></details></div>
+<h3 id="step-10"><span class="stepno">Step 10</span>What can be covered, and filters</h3>
+<p>A cover point can be a variable, an expression or a function's return value. The keyword iff adds a filter, and the point is only sampled when the condition is true.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>watch data, but only on snapshots where OK is true</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>cpt : coverpoint data iff (OK);</code></pre></details></div>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Forgetting new on the covergroup, so no data is ever collected.</li>
+<li>Calling sample() before the variables hold their new values.</li>
+<li>Reading 100 percent as all values seen. It only means all defined bins were hit.</li>
+<li>A transition bin needs back to back samples, not just an eventual arrival.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>A coverpoint is on a 3 bit variable with default settings. How many automatic bins are there?</div><details class="answer"><summary>Show answer</summary><div><p>8, one per value.</p></div></details></li>
+<li><div>A coverpoint is on an 8 bit variable with auto_bin_max set to 16. How many values are in each bin?</div><details class="answer"><summary>Show answer</summary><div><p>256 values over 16 bins is 16 per bin.</p></div></details></li>
+<li><div>For problem 2, the samples are 0, 5, 17 and 255. What is the coverage percentage?</div><details class="answer"><summary>Show answer</summary><div><p>0 and 5 are in bin [0:15], 17 is in [16:31], and 255 is in [240:255]. That is 3 of 16 bins, 18.75 percent.</p></div></details></li>
+<li><div>A transition bin is (3 =&gt; 4). The samples are 3, 3, 4, 5. Is it hit?</div><details class="answer"><summary>Show answer</summary><div><p>Yes. The second 3 is followed directly by 4.</p></div></details></li>
+<li><div>A 4 bit coverpoint uses ignore_bins for {0, 1} and the samples are 0, 2, 3, 3. What is the coverage?</div><details class="answer"><summary>Show answer</summary><div><p>14 bins remain, and 2 and 3 are hit, so 2/14, about 14.3 percent.</p></div></details></li>
+<li><div>Two 2 bit cover points are crossed. How many cross bins exist, and what is the cross coverage after samples (0,1), (0,1), (2,3)?</div><details class="answer"><summary>Show answer</summary><div><p>4 × 4 = 16 bins. Two distinct pairs were seen, so 2/16 = 12.5 percent.</p></div></details></li>
+<li><div>Write a covergroup that samples on posedge clk only when valid is 1, covering a 4 bit opcode with bins for {0}, {[1:7]} and {[8:15]}.</div><details class="answer"><summary>Show answer</summary><div><p>One version is below.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>at every rising clk, but only when valid is 1:
+    look at opcode and sort it into a bin
+        zero    0
+        low     1 to 7
+        high    8 to 15</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>covergroup op_cg @(posedge clk);
+  cp_op : coverpoint opcode iff (valid) {
+    bins zero = {0};
+    bins low  = {[1:7]};
+    bins high = {[8:15]};
+  }
+endgroup</code></pre></details></div></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="03-randomization.html"><span class="dir">Previous</span>Lecture 3. Randomization</a><a class="next" href="05-interfaces.html"><span class="dir">Next</span>Lecture 5. The Interface Construct</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

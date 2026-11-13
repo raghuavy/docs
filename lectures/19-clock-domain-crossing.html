@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 19. Clock Domain Crossing | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lecture 19</span>Clock Domain Crossing</h1><details class="toc"><summary>Steps in this lecture (9)</summary><ol><li><a href="#step-1">Why crossing clocks is dangerous</a></li><li><a href="#step-2">Metastability</a></li><li><a href="#step-3">The two flop synchronizer</a></li><li><a href="#step-4">Data loss and data incoherence</a></li><li><a href="#step-5">How the two clocks can relate</a></li><li><a href="#step-6">Reconvergence</a></li><li><a href="#step-7">Best practices and synchronizer types</a></li><li><a href="#step-8">Verifying CDC in five steps</a></li><li><a href="#step-9">The asynchronous FIFO example</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">A clock domain crossing (CDC) happens whenever a signal launched by a flip flop on one clock is captured by a flip flop on a different clock. Ordinary simulation and timing checks assume one clock, so these paths need their own design rules and their own verification. The lecture ends by verifying an asynchronous FIFO with UVM and assertions, which ties the whole course together.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Why crossing clocks is dangerous</h3>
+<p>The capturing flip flop needs its input steady for a setup time before its clock edge and a hold time after it. When the two clocks are unrelated, the data will eventually change inside that window. Nothing in the design can prevent it.</p>
+<p>Crossings come in two kinds. A synchronous crossing has clocks with a known, fixed relationship. An asynchronous crossing has no fixed relationship and needs a synchronizer, a handshake or a FIFO.</p>
+<h3 id="step-2"><span class="stepno">Step 2</span>Metastability</h3>
+<p>If the input changes inside the setup and hold window, the flip flop can land halfway between 0 and 1 for a while before falling to one side. That in between state is called metastability. The slides compare it to a ball balanced on top of a hill. It will roll off, but you cannot say when or which way.</p>
+<figure class="fig"><svg viewBox="0 0 760 350" role="img" aria-label="MTBF grows exponentially with settle time"><path d="M90 40V290H720" class="ln"/><path d="M85 290.0H90" class="ln"/><text x="80" y="295.0" font-size="14" text-anchor="end" class="tm">-10</text><path d="M85 240.0H90" class="ln"/><text x="80" y="245.0" font-size="14" text-anchor="end" class="tm">0</text><path d="M85 190.0H90" class="ln"/><text x="80" y="195.0" font-size="14" text-anchor="end" class="tm">10</text><path d="M85 140.0H90" class="ln"/><text x="80" y="145.0" font-size="14" text-anchor="end" class="tm">20</text><path d="M85 90.0H90" class="ln"/><text x="80" y="95.0" font-size="14" text-anchor="end" class="tm">30</text><path d="M85 40.0H90" class="ln"/><text x="80" y="45.0" font-size="14" text-anchor="end" class="tm">40</text><text x="90.0" y="312" font-size="14" text-anchor="middle" class="tm">0</text><text x="247.5" y="312" font-size="14" text-anchor="middle" class="tm">250</text><text x="405.0" y="312" font-size="14" text-anchor="middle" class="tm">500</text><text x="562.5" y="312" font-size="14" text-anchor="middle" class="tm">750</text><text x="720.0" y="312" font-size="14" text-anchor="middle" class="tm">1000</text><text x="405.0" y="336" font-size="15" text-anchor="middle" class="tm">S, settle time in picoseconds</text><text x="84" y="24" font-size="15" text-anchor="start" class="tm">log10 of MTBF in seconds</text><path d="M90 202.5H720" class="grid dash"/><text x="720" y="196.5043150273131" font-size="14" text-anchor="end" class="tm">1 year</text><path d="M90 152.5H720" class="grid dash"/><text x="720" y="146.50431502731308" font-size="14" text-anchor="end" class="tm">age of the universe</text><path d="M90.0 271.5L720.0 54.4" class="lna"/><circle cx="90.063" cy="271.48343525422473" r="7" class="filla"/><text x="112.063" y="284" font-size="14" text-anchor="start">S = 0.1 ps: 505 ns</text><circle cx="720.0" cy="54.35790902669399" r="7" class="filla"/><text x="706.0" y="60.35790902669399" font-size="14" text-anchor="end">S = 1 ns: about 4 x 10^29 years</text></svg><figcaption>Computed from the slide&#x27;s numbers: tau 10 ps, TW 20 ps, fC 1 GHz, fD 100 MHz. On a log scale MTBF is a straight line in S.</figcaption></figure>
+<p>Metastability cannot be eliminated, only made unlikely. The measure is MTBF, mean time between failures. The slide's variables are these.</p>
+<ul>
+<li>S is how much time the flip flop gets to settle, measured from the clock edge.</li>
+<li>fC is the clock frequency.</li>
+<li>fD is how often the data changes.</li>
+<li>τ and TW are flip flop constants, each close to one gate delay.</li>
+</ul>
+<p>The probability that one data change causes a failure is</p>
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><mrow><msub><mi>P</mi><mrow><mtext>fail</mtext></mrow></msub><mo>&#x0003D;</mo><msub><mi>T</mi><mi>W</mi></msub><mspace width="0.167em" /><msub><mi>f</mi><mi>C</mi></msub><mspace width="0.167em" /><msup><mi>e</mi><mrow><mo>&#x02212;</mo><mi>S</mi><mo>&#x0002F;</mo><mi>&#x003C4;</mi></mrow></msup></mrow></math>
+<p>Multiplying by fD gives the failure rate, and MTBF is its inverse.</p>
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><mrow><mtext>MTBF</mtext><mo>&#x0003D;</mo><mfrac><mrow><msup><mi>e</mi><mrow><mi>S</mi><mo>&#x0002F;</mo><mi>&#x003C4;</mi></mrow></msup></mrow><mrow><msub><mi>T</mi><mi>W</mi></msub><mspace width="0.167em" /><msub><mi>f</mi><mi>C</mi></msub><mspace width="0.167em" /><msub><mi>f</mi><mi>D</mi></msub></mrow></mfrac></mrow></math>
+<p>The slide plugs in 28 nm numbers, τ = 10 ps and TW = 20 ps, with fC = 1 GHz and fD = 100 MHz. The denominator is 20 ps × 1 GHz × 100 MHz, which is 2 × 10^6 per second.</p>
+<ol>
+<li>With S = 0.1 ps, e^(0.01) is about 1.01, so MTBF is about 1.01 / (2 × 10^6) seconds, which is 505 ns. Failure is practically constant.</li>
+<li>With S = one clock period, 1 ns, e^(100) is about 2.7 × 10^43, so MTBF is about 1.3 × 10^37 seconds, or 4 × 10^29 years. The universe is about 10^10 years old.</li>
+</ol>
+<p>The exponent is the whole story. Giving the flip flop one extra clock period to settle turns constant failure into never.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>The two flop synchronizer</h3>
+<p>That is exactly what a two flop synchronizer does. The first flop may go metastable, and the second flop samples it one full clock later, after it has almost surely settled. The design only fails if both flops fail.</p>
+<figure class="fig"><svg viewBox="0 0 760 215" role="img" aria-label="Two flop synchronizer across a clock domain boundary"><text x="110" y="24" font-size="16" text-anchor="middle" class="tm">source clock domain</text><text x="500" y="24" font-size="16" text-anchor="middle" class="tm">destination clock domain</text><path d="M220 36V230" class="grid dash"/><rect x="30" y="80" width="120" height="80" rx="10" class="bx"/><text x="90.0" y="116.2" font-size="19" text-anchor="middle" font-weight="700">source</text><text x="90.0" y="137.1" font-size="16" text-anchor="middle" class="tm">flop</text><rect x="290" y="80" width="130" height="80" rx="10" class="bxw"/><text x="355.0" y="126.7" font-size="19" text-anchor="middle" font-weight="700">meta</text><rect x="500" y="80" width="130" height="80" rx="10" class="bxa"/><text x="565.0" y="126.7" font-size="19" text-anchor="middle" font-weight="700">q_sync</text><path d="M150 120H290" class="ln" marker-end="url(#ah)"/><path d="M420 120H500" class="ln" marker-end="url(#ah)"/><path d="M630 120H730" class="ln" marker-end="url(#ah)"/><text x="232" y="110" font-size="14" text-anchor="start" class="tm">d_async</text><text x="680" y="110" font-size="14" text-anchor="middle" class="tm">safe</text><text x="355" y="190" font-size="15" text-anchor="middle" class="tw">may go metastable</text><text x="565" y="190" font-size="15" text-anchor="middle" class="tm">a full clock to settle</text></svg><figcaption>The first flop may land between 0 and 1. The second samples it a clock later, after it has almost surely settled.</figcaption></figure>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>at a rising dst_clk, or when rst_n goes low:
+    if in reset:
+        clear both flops
+    else:
+        meta   takes d_async       (may go metastable)
+        q_sync takes the old meta  (had a full clock to settle)
+
+-&gt;  q_sync is d_async, two clocks later, safe to use</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>module sync2 (input logic dst_clk, rst_n, d_async, output logic q_sync);
+  logic meta;
+  always_ff @(posedge dst_clk or negedge rst_n)
+    if (!rst_n) {q_sync, meta} &lt;= &#x27;0;
+    else        {q_sync, meta} &lt;= {meta, d_async};
+endmodule</code></pre></details></div>
+<p>Treating the two failures as independent, the slides square the single flop term.</p>
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><mrow><msub><mtext>MTBF</mtext><mrow><mn>2</mn><mtext>FF</mtext></mrow></msub><mo>&#x0003D;</mo><msup><mrow><mo stretchy="true" fence="true" form="prefix">&#x00028;</mo><mfrac><mrow><msup><mi>e</mi><mrow><mi>S</mi><mo>&#x0002F;</mo><mi>&#x003C4;</mi></mrow></msup></mrow><mrow><msub><mi>T</mi><mi>W</mi></msub><msub><mi>f</mi><mi>C</mi></msub></mrow></mfrac><mo stretchy="true" fence="true" form="postfix">&#x00029;</mo></mrow><mrow><mn>2</mn></mrow></msup><mfrac><mrow><mn>1</mn></mrow><mrow><msub><mi>f</mi><mi>D</mi></msub></mrow></mfrac><mspace width="1em" /><mtext>versus</mtext><mspace width="1em" /><msub><mtext>MTBF</mtext><mrow><mn>1</mn><mtext>FF</mtext></mrow></msub><mo>&#x0003D;</mo><mfrac><mrow><msup><mi>e</mi><mrow><mi>S</mi><mo>&#x0002F;</mo><mi>&#x003C4;</mi></mrow></msup></mrow><mrow><msub><mi>T</mi><mi>W</mi></msub><msub><mi>f</mi><mi>C</mi></msub></mrow></mfrac><mo>&#x000B7;</mo><mfrac><mrow><mn>1</mn></mrow><mrow><msub><mi>f</mi><mi>D</mi></msub></mrow></mfrac></mrow></math>
+<h3 id="step-4"><span class="stepno">Step 4</span>Data loss and data incoherence</h3>
+<p>How close the data change lands to the clock edge decides what goes wrong.</p>
+<figure class="fig"><svg viewBox="0 0 760 290" role="img" aria-label="Bus bits resolving on different cycles"><path d="M200 30V250" class="grid dash"/><path d="M320 30V250" class="grid dash"/><path d="M440 30V250" class="grid dash"/><path d="M560 30V250" class="grid dash"/><path d="M680 30V250" class="grid dash"/><text x="200" y="22" font-size="13" text-anchor="middle" class="tm">dst edge 0</text><text x="320" y="22" font-size="13" text-anchor="middle" class="tm">dst edge 1</text><text x="440" y="22" font-size="13" text-anchor="middle" class="tm">dst edge 2</text><text x="560" y="22" font-size="13" text-anchor="middle" class="tm">dst edge 3</text><text x="680" y="22" font-size="13" text-anchor="middle" class="tm">dst edge 4</text><rect x="320" y="150" width="120" height="100" class="fillw" opacity="0.18"/><text x="186" y="64" font-size="16" text-anchor="end" font-weight="700">X[1]</text><path d="M160 68H250V44H700" class="ln"/><text x="186" y="116" font-size="16" text-anchor="end" font-weight="700">X[0]</text><path d="M160 120H250V96H700" class="ln"/><text x="186" y="188" font-size="16" text-anchor="end" font-weight="700">Y[1]</text><path d="M160 192H440V168H700" class="ln"/><text x="186" y="240" font-size="16" text-anchor="end" font-weight="700">Y[0]</text><path d="M160 244H320V220H700" class="ln"/><text x="380.0" y="276" font-size="15" text-anchor="middle" class="tw" font-weight="700">Y reads 01 here, a value X never had</text></svg><figcaption>X goes from 00 to 11 at once, but each bit crosses through its own synchronizer and may arrive a cycle apart.</figcaption></figure>
+<ul>
+<li>Data loss. A short pulse in the source domain can fall entirely between two destination edges and never be seen.</li>
+<li>Data incoherence. Bits of a bus can each resolve on a different cycle. In the slide, X[1:0] crosses into Y[1:0] and only 00 and 11 are legal. Going from 00 to 11, one bit may arrive a cycle before the other, so Y briefly reads 01 or 10, a value the design never intended.</li>
+</ul>
+<h3 id="step-5"><span class="stepno">Step 5</span>How the two clocks can relate</h3>
+<ol>
+<li>Same frequency, no phase difference. This is really one clock domain.</li>
+<li>Same frequency, constant phase difference.</li>
+<li>Asynchronous, with no fixed relationship.</li>
+<li>Different frequency with a varying phase difference, either integer multiples or rational multiples. Edges are sometimes never close and sometimes intermittently close, which is the dangerous case.</li>
+</ol>
+<p>Jitter, small random variation in when clock edges arrive, either chip wide or local, makes even nominally related clocks drift close to each other.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>Reconvergence</h3>
+<p>Reconvergence means two signals cross through separate synchronizers and then meet again in logic. Each synchronizer may take one cycle or two, so the two signals can arrive a cycle apart. This is incoherence again, hidden behind correct looking synchronizers.</p>
+<h3 id="step-7"><span class="stepno">Step 7</span>Best practices and synchronizer types</h3>
+<ul>
+<li>Register a signal in its source domain before it crosses. Never feed combinational logic straight into a synchronizer, because its glitches can be captured.</li>
+<li>Synchronize each single bit control signal with a two flop synchronizer.</li>
+<li>Never synchronize a multi bit bus one bit at a time. Use Gray code, a handshake or a FIFO.</li>
+<li>A signal crossing into a slower domain should stay stable for about 1.5 times the receiving clock period. This is called the three edge requirement, because the receiver then sees it across three consecutive clock edges.</li>
+</ul>
+<p>The three standard synchronizer types follow.</p>
+<ol>
+<li>Multiple flip flops, as in Step 3, for single bits.</li>
+<li>Recirculation mux. A synchronized enable selects new data into the destination register, and otherwise the register feeds its own value back. The data bus only needs to be stable while the enable crosses.</li>
+<li>Closed loop, a request and acknowledge handshake. The source holds data and raises req, the destination synchronizes req, captures the data and returns ack, and the source waits for the synchronized ack before changing anything.</li>
+</ol>
+<p>For streams of data, the answer is a FIFO synchronizer, from Cummings' SNUG paper. It is the asynchronous FIFO in Step 9.</p>
+<h3 id="step-8"><span class="stepno">Step 8</span>Verifying CDC in five steps</h3>
+<p>These steps come from Yeung's Mentor paper, Five Steps to Quality CDC Verification.</p>
+<ol>
+<li>Identify which blocks have crossings.</li>
+<li>Document the CDC requirements, meaning the operating modes, the clocks, the interface signals and the synchronization rules.</li>
+<li>Formalize known exceptions. For example, configuration, status and control registers that are set once and then held stable may not need a synchronizer.</li>
+<li>Define coverage goals.</li>
+<li>Choose a strategy. That could be block level, top level, triage and bug hunting, or targeting coverage.</li>
+</ol>
+<p>At block level, structural analysis reports correct synchronizers, missing or broken ones, complex ones that need protocol checks, and possible reconvergence. Then formal analysis verifies the protocols.</p>
+<p>At top level, structural checks repeat with similar criteria, protocols are checked with constrained random simulation, and metastability effects are checked by injecting random extra delays at synchronizers during simulation.</p>
+<h3 id="step-9"><span class="stepno">Step 9</span>The asynchronous FIFO example</h3>
+<p>The slides verify an open source asynchronous FIFO from GitHub. It has five parts.</p>
+<figure class="fig"><svg viewBox="0 0 760 345" role="img" aria-label="Asynchronous FIFO with Gray pointers crossing through synchronizers"><text x="200" y="24" font-size="16" text-anchor="middle" class="tm">write clock domain</text><text x="560" y="24" font-size="16" text-anchor="middle" class="tm">read clock domain</text><path d="M380 34V340" class="grid dash"/><rect x="40" y="60" width="200" height="80" rx="10" class="bx"/><text x="140.0" y="96.2" font-size="19" text-anchor="middle" font-weight="700">fifo_wr</text><text x="140.0" y="117.0" font-size="16" text-anchor="middle" class="tm">write pointer, full</text><rect x="280" y="60" width="200" height="80" rx="10" class="bxa"/><text x="380.0" y="96.2" font-size="19" text-anchor="middle" font-weight="700">fifo_mem</text><text x="380.0" y="117.0" font-size="16" text-anchor="middle" class="tm">8 bit RAM</text><rect x="520" y="60" width="200" height="80" rx="10" class="bx"/><text x="620.0" y="96.2" font-size="19" text-anchor="middle" font-weight="700">fifo_rd</text><text x="620.0" y="117.0" font-size="16" text-anchor="middle" class="tm">read pointer, empty</text><rect x="180" y="230" width="150" height="70" rx="10" class="bxw"/><text x="255.0" y="261.2" font-size="19" text-anchor="middle" font-weight="700">sync</text><text x="255.0" y="282.1" font-size="16" text-anchor="middle" class="tm">to write side</text><rect x="430" y="230" width="150" height="70" rx="10" class="bxw"/><text x="505.0" y="261.2" font-size="19" text-anchor="middle" font-weight="700">sync</text><text x="505.0" y="282.1" font-size="16" text-anchor="middle" class="tm">to read side</text><path d="M240 100H280" class="ln" marker-end="url(#ah)"/><path d="M480 100H520" class="ln" marker-end="url(#ah)"/><path d="M200 140V190H505V230" class="ln" marker-end="url(#ah)"/><text x="350" y="182" font-size="14" text-anchor="middle" class="tm">gray_w_ptr</text><path d="M580 265H620V140" class="ln" marker-end="url(#ah)"/><text x="630" y="210" font-size="14" text-anchor="start" class="tm">w2r_ptr</text><path d="M680 140V325H255V300" class="ln" marker-end="url(#ah)"/><text x="470" y="318" font-size="14" text-anchor="middle" class="tm">gray_rd_ptr</text><path d="M180 265H120V140" class="ln" marker-end="url(#ah)"/><text x="110" y="210" font-size="14" text-anchor="end" class="tm">r2w_ptr</text></svg><figcaption>Only the Gray coded pointers cross between clocks, each through its own synchronizer. One bit changes per step, so a pointer caught mid change reads as the old or the new value.</figcaption></figure>
+<ol>
+<li>fifo_mem, the RAM with 8 bit data and configurable depth.</li>
+<li>fifo_wr, the write side. It produces binary write addresses and a Gray coded write pointer, gray_w_ptr, and computes the full flag.</li>
+<li>fifo_rd, the read side. It produces read addresses and a Gray coded read pointer, gray_rd_ptr, and computes the empty flag.</li>
+<li>Two BIT_SYNC multi flop synchronizers. One carries the write pointer into the read domain as w2r_ptr, and the other carries the read pointer into the write domain as r2w_ptr.</li>
+<li>Gray code for the pointers. In Gray code only one bit changes per increment. If a crossing catches the pointer mid change, it reads either the old value or the new one, never a wild value. That is how the FIFO avoids the incoherence problem from Step 4.</li>
+</ol>
+<p>The UVM environment uses exactly the parts from Lectures 8 and 12. It has an interface, a sequence item, sequences for reset, fill, empty, concurrent read and write and edge cases, a driver, a monitor, an agent, an environment with a scoreboard and coverage, and a test.</p>
+<p>The verification plan lists each feature with a goal, and every row is checked with a concurrent assertion. The features are write, read and end to end data integrity, pointer increments and wraparound, Gray conversion, both pointer synchronizations, the full and empty flags, reset in each domain, back to back operations, different clock ratios, and full to empty transitions. The core rules are no writes when full and no reads when empty.</p>
+<p>Here are assertions in that style. They are sketches of the idea, not the repo's exact code.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>gray_w_ptr: at most one bit changes per write clock
+
+write while full:   the write pointer does not move next clock
+read while empty:   the read pointer does not move next clock
+
+after a write side reset: both write pointers are 0</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code><span class="c">// a Gray pointer changes by at most one bit per clock</span>
+ap_gray_w: assert property (@(posedge w_clk) disable iff (!w_rstn)
+  $onehot0(gray_w_ptr ^ $past(gray_w_ptr)));
+
+<span class="c">// a write attempted while full must not move the write pointer</span>
+ap_no_wr_full: assert property (@(posedge w_clk) disable iff (!w_rstn)
+  (o_full &amp;&amp; i_w_en) |=&gt; $stable(w_ptr));
+
+<span class="c">// a read attempted while empty must not move the read pointer</span>
+ap_no_rd_empty: assert property (@(posedge r_clk) disable iff (!r_rstn)
+  (o_empty &amp;&amp; i_r_en) |=&gt; $stable(rd_ptr));
+
+<span class="c">// after a write domain reset, the pointers are zero</span>
+ap_w_reset: assert property (@(posedge w_clk) !w_rstn |=&gt; (w_ptr == 0 &amp;&amp; gray_w_ptr == 0));</code></pre></details></div>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Synchronizing a bus bit by bit.</li>
+<li>Combinational logic right before a synchronizer.</li>
+<li>Two separately synchronized signals recombined downstream.</li>
+<li>Trusting a clean zero delay simulation, which never shows metastability unless delays are injected.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>In one sentence, what is metastability?</div><details class="answer"><summary>Show answer</summary><div><p>A flip flop caught between 0 and 1 for an unpredictable time because its input changed inside the setup and hold window.</p></div></details></li>
+<li><div>Using the MTBF formula, what happens to MTBF if S doubles? What if fC doubles while S stays fixed?</div><details class="answer"><summary>Show answer</summary><div><p>Doubling S squares the e^(S/τ) term, so MTBF grows enormously. Doubling fC halves MTBF if S is unchanged, though in practice a faster clock also shrinks S.</p></div></details></li>
+<li><div>Recompute the slide's MTBF for S = 0.5 ns with the same τ, TW, fC and fD. Give the answer in years.</div><details class="answer"><summary>Show answer</summary><div><p>S/τ = 500 ps / 10 ps = 50, and e^50 is about 5.2 × 10^21. Dividing by 2 × 10^6 gives about 2.6 × 10^15 seconds, which is about 8 × 10^7 years.</p></div></details></li>
+<li><div>Why is a two flop synchronizer fine for a single enable bit but wrong for an 8 bit counter value?</div><details class="answer"><summary>Show answer</summary><div><p>Each bit can resolve on a different cycle, so the counter can briefly read a value that never existed. Use Gray code, a handshake or a FIFO.</p></div></details></li>
+<li><div>Write the 3 bit Gray code sequence from 0 to 7. How many bits change between each pair, including 7 back to 0?</div><details class="answer"><summary>Show answer</summary><div><p>000, 001, 011, 010, 110, 111, 101, 100, then back to 000. Exactly one bit changes at every step, including the wrap.</p></div></details></li>
+<li><div>A pulse in a 500 MHz domain is one cycle wide and crosses into a 100 MHz domain. Will it be seen reliably? What should the source do?</div><details class="answer"><summary>Show answer</summary><div><p>No. The 2 ns pulse can fall between 10 ns receiving edges. Stretch it to at least 1.5 receiving periods, 15 ns, or use a handshake.</p></div></details></li>
+<li><div>Write an assertion that w2r_ptr, the write pointer as seen in the read domain, changes by at most one bit per read clock.</div><details class="answer"><summary>Show answer</summary><div><p><code>assert property (@(posedge r_clk) disable iff (!r_rstn) $onehot0(w2r_ptr ^ $past(w2r_ptr)));</code></p></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="16-18-sva.html"><span class="dir">Previous</span>Lectures 16 to 18. SVA</a><span style="flex:1"></span></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

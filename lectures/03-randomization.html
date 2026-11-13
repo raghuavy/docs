@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 3. Randomization | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lecture 3</span>Randomization</h1><details class="toc"><summary>Steps in this lecture (13)</summary><ol><li><a href="#step-1">Directed versus constrained random</a></li><li><a href="#step-2">What you can randomize</a></li><li><a href="#step-3">System functions</a></li><li><a href="#step-4">randcase</a></li><li><a href="#step-5">rand, randc and randomize()</a></li><li><a href="#step-6">Constraint blocks</a></li><li><a href="#step-7">Three ways to change constraints</a></li><li><a href="#step-8">inside and enum</a></li><li><a href="#step-9">Weighted distributions with dist</a></li><li><a href="#step-10">Constraints are solved together</a></li><li><a href="#step-11">Keep the solver fast</a></li><li><a href="#step-12">solve before</a></li><li><a href="#step-13">Custom distributions</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">You cannot try every input on a big design, so you let the simulator pick random inputs inside rules you write. Those rules are called constraints, and the approach is called constrained random testing (CRT).</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Directed versus constrained random</h3>
+<p>A directed test applies one input you think will cause trouble. It only finds bugs you already imagined.</p>
+<figure class="fig"><svg viewBox="0 0 760 285" role="img" aria-label="Constrained random test loop"><rect x="20" y="108" width="180" height="74" rx="10" class="bx"/><text x="110.0" y="141.2" font-size="19" text-anchor="middle" font-weight="700">generator</text><text x="110.0" y="162.1" font-size="16" text-anchor="middle" class="tm">random inputs</text><rect x="300" y="24" width="170" height="70" rx="10" class="bx"/><text x="385.0" y="65.7" font-size="19" text-anchor="middle" font-weight="700">DUT</text><rect x="300" y="196" width="170" height="70" rx="10" class="bx"/><text x="385.0" y="227.2" font-size="19" text-anchor="middle" font-weight="700">reference</text><text x="385.0" y="248.1" font-size="16" text-anchor="middle" class="tm">model</text><rect x="570" y="108" width="170" height="74" rx="10" class="bxa"/><text x="655.0" y="141.2" font-size="19" text-anchor="middle" font-weight="700">compare</text><text x="655.0" y="162.1" font-size="16" text-anchor="middle" class="tm">pass or fail</text><path d="M200 145H250V59H300" class="ln" marker-end="url(#ah)"/><path d="M250 145V231H300" class="ln" marker-end="url(#ah)"/><path d="M470 59H520V130H570" class="ln" marker-end="url(#ah)"/><path d="M470 231H520V160H570" class="ln" marker-end="url(#ah)"/><text x="478" y="48" font-size="16" text-anchor="start" class="tm">actual</text><text x="478" y="222" font-size="16" text-anchor="start" class="tm">expected</text></svg><figcaption>The same random inputs go to the DUT and to a reference model. A checker compares the two answers.</figcaption></figure>
+<p>A constrained random test applies many random inputs that still obey the protocol. It reaches corners nobody thought of.</p>
+<p>A typical CRT setup has three parts.</p>
+<ol>
+<li>A generator creates a stream of pseudo random inputs and drives the DUT.</li>
+<li>A reference model predicts the correct output for each input.</li>
+<li>A comparison checks the DUT output against the prediction.</li>
+</ol>
+<p>Pseudo random means the numbers look random but come from a formula, so the same seed repeats the same sequence. That is what lets you rerun a failing test.</p>
+<h3 id="step-2"><span class="stepno">Step 2</span>What you can randomize</h3>
+<ul>
+<li>Input data, alone or bundled into a transaction with constraints.</li>
+<li>Environment configuration. The slide example is a switch chip where you randomize 1 to 4 PCI buses, 1 to 8 devices per bus, and each device's settings.</li>
+<li>Protocol exceptions, meaning deliberately bad stimulus to check the DUT detects errors.</li>
+<li>Delays between transactions.</li>
+</ul>
+<h3 id="step-3"><span class="stepno">Step 3</span>System functions</h3>
+<ol>
+<li><code>$random</code> returns a 32 bit signed value. Without a seed it produces the same sequence every run. Pass a seed variable to get a different sequence.</li>
+<li>Because <code>$random</code> is signed, <code>$random % 100</code> gives values from -99 to 99. That is why the slide output has negative numbers.</li>
+<li><code>$urandom</code> returns an unsigned 32 bit value from a better generator.</li>
+<li><code>$urandom_range(max, min)</code> returns an unsigned value from min to max. If you leave out min it defaults to 0.</li>
+</ol>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>repeat 3 times:
+    q = a random number from 1 to 10
+    print q</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>int q;
+initial repeat (3) begin
+  q = $urandom_range(10, 1);   <span class="c">// 1 through 10</span>
+  $display(&quot;%0d&quot;, q);
+end</code></pre></details></div>
+<h3 id="step-4"><span class="stepno">Step 4</span>randcase</h3>
+<p>randcase picks one branch at random using weights. Each branch's chance is its weight divided by the total.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>pick ONE line at random, using weights out of 10:
+    statement1   1 in 10
+    statement2   4 in 10
+    statement3   5 in 10</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>randcase
+  1: statement1;   <span class="c">// 1 out of 10</span>
+  4: statement2;   <span class="c">// 4 out of 10</span>
+  5: statement3;   <span class="c">// 5 out of 10</span>
+endcase</code></pre></details></div>
+<h3 id="step-5"><span class="stepno">Step 5</span>rand, randc and randomize()</h3>
+<p>Inside a class you mark a variable rand or randc, then call randomize() on the object.</p>
+<ul>
+<li>rand gives a uniform random value each call. Repeats are allowed.</li>
+<li>randc is cyclic. It walks through every possible value in random order before any value repeats.</li>
+<li>randomize() returns 1 when it found values that satisfy every constraint, and 0 when it could not.</li>
+</ul>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>class example has one random integer
+
+build one object
+repeat 10 times:
+    try to randomize it
+    if that worked:  print the value
+    otherwise:       print &quot;randomize failure&quot;</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class example;
+  rand integer variable;
+endclass
+
+example thing = new();
+initial repeat (10)
+  if (thing.randomize()) $display(&quot;random value is %0d&quot;, thing.variable);
+  else                   $display(&quot;randomize failure&quot;);</code></pre></details></div>
+<p>Always check the return value. A failed randomize leaves the old values in place and your test keeps going with stale data.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>Constraint blocks</h3>
+<p>A constraint block is a named set of rules. The solver only returns values that make every rule true.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>class small_class has a random integer x
+
+rule allowed_x:
+    x is bigger than 0
+    x is smaller than 10</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class small_class;
+  rand integer x;
+  constraint allowed_x { x &gt; 0; x &lt; 10; }
+endclass</code></pre></details></div>
+<h3 id="step-7"><span class="stepno">Step 7</span>Three ways to change constraints</h3>
+<ol>
+<li>Replace by inheritance. A child class that declares a constraint with the same name replaces the parent's version.</li>
+<li>Add more with an inline constraint. randomize() with { ... } adds rules for just that one call.</li>
+<li>Turn one off. obj.constraint_name.constraint_mode(0) disables that block.</li>
+</ol>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>large_class is a child of small_class
+its rule has the SAME name, so it replaces the parent&#x27;s rule:
+    x is between 10 and 20
+
+build a small_class object s
+randomize s, adding one extra rule for this call only:  x &gt; 5
+    -&gt;  x ends up between 6 and 9</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class large_class extends small_class;
+  constraint allowed_x { x &gt; 10; x &lt; 20; }   <span class="c">// replaces the parent rule</span>
+endclass
+
+initial begin
+  small_class s = new();
+  void&#x27;(s.randomize() with { x &gt; 5; });     <span class="c">// now x is 6 to 9</span>
+end</code></pre></details></div>
+<p>In the slide run, small_obj gave values like 2 and 5 while large_obj gave 15 and 13.</p>
+<h3 id="step-8"><span class="stepno">Step 8</span>inside and enum</h3>
+<p>The inside operator means the value must be a member of a set. The set can mix single values and ranges.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>len is a random 8 bit number
+
+rule: len must be one of
+    1, 2, 4, or anything from 64 to 127</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>rand bit [7:0] len;
+constraint c_len { len inside {1, 2, 4, [64:127]}; }</code></pre></details></div>
+<p>A rand variable of enum type only ever takes one of the listed names.</p>
+<h3 id="step-9"><span class="stepno">Step 9</span>Weighted distributions with dist</h3>
+<p>dist keeps values random but makes some more likely. The difference between := and :/ only matters for ranges.</p>
+<figure class="fig"><svg viewBox="0 0 760 315" role="img" aria-label="Probabilities from := and :/ in a dist constraint"><text x="20" y="30" font-size="18" text-anchor="start" font-weight="700">100 := 1,  [200:201] := 4</text><text x="20" y="54" font-size="16" text-anchor="start" class="tm">each value in the range gets weight 4</text><text x="70" y="86" font-size="16" text-anchor="end" class="tm">100</text><rect x="80" y="70" width="66.66666666666667" height="22" rx="4" class="bxa"/><text x="156.66666666666669" y="87" font-size="16" text-anchor="start">1/9</text><text x="70" y="116" font-size="16" text-anchor="end" class="tm">200</text><rect x="80" y="100" width="266.6666666666667" height="22" rx="4" class="bxa"/><text x="356.6666666666667" y="117" font-size="16" text-anchor="start">4/9</text><text x="70" y="146" font-size="16" text-anchor="end" class="tm">201</text><rect x="80" y="130" width="266.6666666666667" height="22" rx="4" class="bxa"/><text x="356.6666666666667" y="147" font-size="16" text-anchor="start">4/9</text><text x="20" y="185" font-size="18" text-anchor="start" font-weight="700">100 := 1,  [200:201] :/ 4</text><text x="20" y="209" font-size="16" text-anchor="start" class="tm">the range shares weight 4</text><text x="70" y="241" font-size="16" text-anchor="end" class="tm">100</text><rect x="80" y="225" width="120.0" height="22" rx="4" class="bxa"/><text x="210.0" y="242" font-size="16" text-anchor="start">1/5</text><text x="70" y="271" font-size="16" text-anchor="end" class="tm">200</text><rect x="80" y="255" width="240.0" height="22" rx="4" class="bxa"/><text x="330.0" y="272" font-size="16" text-anchor="start">2/5</text><text x="70" y="301" font-size="16" text-anchor="end" class="tm">201</text><rect x="80" y="285" width="240.0" height="22" rx="4" class="bxa"/><text x="330.0" y="302" font-size="16" text-anchor="start">2/5</text></svg><figcaption>Bar length is the chance of each value. With := the range gets 4 per value. With :/ the range splits 4 between its values.</figcaption></figure>
+<ul>
+<li>:= gives every value in the range that full weight.</li>
+<li>:/ splits the weight evenly across the range.</li>
+</ul>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>line 1:  100 weight 1,  200 weight 2,  400 weight 4
+
+line 2 (:=  every value in a range gets the full weight)
+         100 weight 1,  200 weight 4,  201 weight 4
+
+line 3 (:/  a range shares its weight)
+         100 weight 1,  200 weight 2,  201 weight 2</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>x dist { 100 := 1, 200 := 2, 400 := 4 };   <span class="c">// 200 twice as likely as 100</span>
+x dist { 100 := 1, [200:201] := 4 };       <span class="c">// 100 gets 1, 200 gets 4, 201 gets 4</span>
+x dist { 100 := 1, [200:201] :/ 4 };       <span class="c">// 100 gets 1, 200 gets 2, 201 gets 2</span></code></pre></details></div>
+<h3 id="step-10"><span class="stepno">Step 10</span>Constraints are solved together</h3>
+<p>Constraints are not executed top to bottom. The solver treats them as one system of equations, so a rule about one variable can limit another.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>b, c and d are random 16 bit numbers
+
+all of these must be true at the same time:
+    b &lt; d
+    c equals b
+    d &lt; 30
+    c &gt; 25
+
+-&gt;  b and c land on 26, 27 or 28
+-&gt;  d lands on 27, 28 or 29</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>rand logic [15:0] b, c, d;
+constraint c_bidir {
+  b &lt; d;
+  c == b;
+  d &lt; 30;
+  c &gt; 25;
+}</code></pre></details></div>
+<p>Since c equals b and c is above 25, b is at least 26. Since b is below d and d is below 30, d lands between 27 and 29. The slide runs show results like b = 26, c = 26, d = 27.</p>
+<h3 id="step-11"><span class="stepno">Step 11</span>Keep the solver fast</h3>
+<p>Multiply, divide and modulo are expensive for the solver. Pick bits instead when you can.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>slow version:
+    addr divided by 4096 leaves a remainder within 20 of either end
+    (the solver has to do a division)
+
+fast version, same meaning:
+    the low 12 bits of addr are within 20 of either end
+    (no division, just look at bits)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code><span class="c">// slow</span>
+constraint slow_near_page { addr % 4096 inside {[0:20], [4075:4095]}; }
+<span class="c">// fast, same meaning, because 4096 is 2 to the 12th</span>
+constraint near_page      { addr[11:0] inside {[0:20], [4075:4095]}; }</code></pre></details></div>
+<h3 id="step-12"><span class="stepno">Step 12</span>solve before</h3>
+<p>solve before changes the probability of each answer, never which answers are legal. Here is the slide example.</p>
+<figure class="fig"><svg viewBox="0 0 760 380" role="img" aria-label="Probability tree for solve x before y"><rect x="20" y="150" width="110" height="44" rx="10" class="bx"/><text x="75.0" y="178.7" font-size="19" text-anchor="middle" font-weight="700">pick x</text><rect x="220" y="50" width="110" height="44" rx="10" class="bx"/><text x="275.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">x = 0</text><rect x="220" y="214" width="110" height="44" rx="10" class="bx"/><text x="275.0" y="242.7" font-size="19" text-anchor="middle" font-weight="700">x = 1</text><path d="M130 172H175V72H220" class="ln" marker-end="url(#ah)"/><path d="M175 172V236H220" class="ln" marker-end="url(#ah)"/><text x="183" y="110" font-size="16" text-anchor="start" class="tm">1/2</text><text x="183" y="214" font-size="16" text-anchor="start" class="tm">1/2</text><rect x="450" y="50" width="120" height="44" rx="10" class="bxa"/><text x="510.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">y = 0</text><path d="M330 72H450" class="ln" marker-end="url(#ah)"/><text x="390" y="64" font-size="15" text-anchor="middle" class="tm">always</text><rect x="450" y="162" width="120" height="44" rx="10" class="bxa"/><text x="510.0" y="190.7" font-size="19" text-anchor="middle" font-weight="700">y = 0</text><path d="M390 236V184H450" class="ln" marker-end="url(#ah)"/><text x="590" y="190" font-size="17" text-anchor="start">1/8</text><rect x="450" y="214" width="120" height="44" rx="10" class="bx"/><text x="510.0" y="242.7" font-size="19" text-anchor="middle" font-weight="700">y = 1</text><path d="M390 236H450" class="ln" marker-end="url(#ah)"/><text x="590" y="242" font-size="17" text-anchor="start">1/8</text><rect x="450" y="266" width="120" height="44" rx="10" class="bx"/><text x="510.0" y="294.6" font-size="19" text-anchor="middle" font-weight="700">y = 2</text><path d="M390 236V288H450" class="ln" marker-end="url(#ah)"/><text x="590" y="294" font-size="17" text-anchor="start">1/8</text><rect x="450" y="318" width="120" height="44" rx="10" class="bx"/><text x="510.0" y="346.6" font-size="19" text-anchor="middle" font-weight="700">y = 3</text><path d="M390 236V340H450" class="ln" marker-end="url(#ah)"/><text x="590" y="346" font-size="17" text-anchor="start">1/8</text><path d="M330 236H390" class="ln"/><text x="360" y="264" font-size="14" text-anchor="middle" class="tm">1/4 each</text><text x="590" y="78" font-size="17" text-anchor="start">1/2</text></svg><figcaption>x is chosen first. y = 0 happens on the whole top branch (1/2) plus one leaf of the bottom branch (1/8), so 5/8 in total.</figcaption></figure>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>x is a random bit, y is a random number from 0 to 3
+
+rule: if x is 0, then y must be 0
+choose x first, then y
+
+-&gt;  x is 0 half the time and 1 half the time
+-&gt;  y is 0 with probability 1/2 + 1/8 = 5/8</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class SolveBefore;
+  rand bit x;          <span class="c">// 0 or 1</span>
+  rand bit [1:0] y;    <span class="c">// 0 to 3</span>
+  constraint c_xy {
+    (x == 0) -&gt; y == 0;
+    solve x before y;
+  }
+endclass</code></pre></details></div>
+<ol>
+<li>The arrow means implies. If x is 0, y must be 0.</li>
+<li>With solve x before y, x is picked first with a 1/2 chance each way. When x is 0, y is 0. When x is 1, y is any of 4 values. So y is 0 with probability 1/2 + 1/8 = 5/8.</li>
+<li>With solve y before x instead, y is picked first, each value 1/4. If y is not 0, x must be 1. If y is 0, x is a coin flip. So x is 0 only 1/4 × 1/2 = 1/8 of the time.</li>
+<li>With no solve before at all, the solver picks evenly among the 5 legal pairs, so x is 0 with probability 1/5.</li>
+</ol>
+<h3 id="step-13"><span class="stepno">Step 13</span>Custom distributions</h3>
+<p>You can shape any distribution in pre_randomize(), a method that runs automatically just before randomize(). The slide builds a bathtub shape, high at both ends and low in the middle, using <code>$dist_exponential</code> and then flipping half the values to the other side. Other built ins include <code>$dist_normal</code> and <code>$dist_poisson</code>.</p>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Ignoring the return value of randomize().</li>
+<li>Expecting <code>$random % N</code> to be non negative.</li>
+<li>Thinking constraints run in order. They are solved all at once.</li>
+<li>Writing a child constraint with the same name and expecting it to add to the parent. It replaces it.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>What range can <code>$urandom_range(10)</code> return?</div><details class="answer"><summary>Show answer</summary><div><p>0 through 10.</p></div></details></li>
+<li><div>A randcase has weights 2, 3 and 5. What is the chance of each branch?</div><details class="answer"><summary>Show answer</summary><div><p>2/10, 3/10 and 5/10.</p></div></details></li>
+<li><div>A 2 bit variable is declared randc. You randomize it 4 times. How many distinct values do you see?</div><details class="answer"><summary>Show answer</summary><div><p>All 4 values, each once, because randc cycles before repeating.</p></div></details></li>
+<li><div>Find the probabilities for <code>x dist { 0 := 1, [1:3] := 2 };</code>.</div><details class="answer"><summary>Show answer</summary><div><p>The total weight is 1 + 2 + 2 + 2 = 7. So 0 has 1/7, and 1, 2 and 3 each have 2/7.</p></div></details></li>
+<li><div>Same as problem 4 but with :/ instead of := on the range.</div><details class="answer"><summary>Show answer</summary><div><p>The range shares 2, so each of 1, 2, 3 gets 2/3. The total is 3. So 0 has 1/3 and each other value has 2/9.</p></div></details></li>
+<li><div>Variables are <code>rand bit [3:0] a, b;</code> with <code>constraint c { a &gt; 1; a &lt; b; b &lt; 4; }</code>. What are the only legal values?</div><details class="answer"><summary>Show answer</summary><div><p>a must be 2 and b must be 3.</p></div></details></li>
+<li><div>Write one efficient constraint block that makes a 32 bit addr word aligned (a multiple of 4) and between 'h1000 and 'h1FFF.</div><details class="answer"><summary>Show answer</summary><div><p><code>constraint c_addr { addr[1:0] == 0; addr inside {['h1000:'h1FFF]}; }</code></p></div></details></li>
+<li><div>Variables are <code>rand bit x; rand bit [2:0] y;</code> with <code>(x == 1) -&gt; y == 0</code>. Find P(x = 1) with no solve before, then with solve x before y.</div><details class="answer"><summary>Show answer</summary><div><p>Legal pairs are x = 0 with 8 y values, plus x = 1 with y = 0, so 9 pairs and P(x = 1) is 1/9. With solve x before y, x is picked first, so P(x = 1) is 1/2.</p></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="02-oop.html"><span class="dir">Previous</span>Lecture 2. OOP in SystemVerilog</a><a class="next" href="04-coverage-basics.html"><span class="dir">Next</span>Lecture 4. Functional Coverage Basics</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

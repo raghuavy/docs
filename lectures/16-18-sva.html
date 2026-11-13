@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lectures 16 to 18. SVA | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lectures 16 to 18</span>SVA</h1><details class="toc"><summary>Steps in this lecture (12)</summary><ol><li><a href="#step-1">Immediate and concurrent, as Mehta frames them</a></li><li><a href="#step-2">Implication, again</a></li><li><a href="#step-3">Aside on print statements</a></li><li><a href="#step-4">Reusability versus readability</a></li><li><a href="#step-5">Where the clock comes from</a></li><li><a href="#step-6">Delays and ranges</a></li><li><a href="#step-7">A common fix, use $rose</a></li><li><a href="#step-8">disable iff is used once</a></li><li><a href="#step-9">Binding properties to a design</a></li><li><a href="#step-10">Consecutive repetition [*m]</a></li><li><a href="#step-11">Non consecutive repetition [=m] and goto repetition [-&amp;gt;m]</a></li><li><a href="#step-12">Combining sequences</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">This deck turns assertions into a working toolkit. It covers how to clock and organize properties, then walks through every sequence operator for repetition and combining sequences. Most slides are figures from Mehta, SystemVerilog Assertions and Functional Coverage, so the examples below are written fresh to show the same operators.</p>
+<p>One idea makes every operator easier. A sequence can start on every clock edge, and each start is its own independent attempt, called a thread. An assertion fails if any attempt that started fails.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Immediate and concurrent, as Mehta frames them</h3>
+<p>An immediate assertion is not temporal. It lives inside procedural code, runs the moment it is reached, tests one condition, and runs a pass or fail action. It can be fooled by glitches, which deferred assertions fix.</p>
+<p>A concurrent assertion is built on sequences over time and samples on a clock edge. Its property has an antecedent that is sampled and a consequent that is checked. Action blocks say what happens on pass or fail.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>at each rising clk where req is high:
+    ack must be high on the next clock
+    if it passes:  print &quot;pass&quot;
+    if it fails:   error &quot;ack missing&quot;</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>ap_req: assert property (@(posedge clk) req |=&gt; ack)
+  $display(&quot;pass&quot;);                 <span class="c">// pass action, optional</span>
+  else $error(&quot;ack missing&quot;);        <span class="c">// fail action</span></code></pre></details></div>
+<h3 id="step-2"><span class="stepno">Step 2</span>Implication, again</h3>
+<ol>
+<li>If the antecedent is false, nothing is checked for that attempt.</li>
+<li>If it is true, the consequent is checked.</li>
+<li>|-&gt; starts the consequent on the same edge. |=&gt; starts it on the next edge, so <code>a |=&gt; b</code> is exactly <code>a |-&gt; ##1 b</code>.</li>
+</ol>
+<p>You do not need sequence ... endsequence for a simple sequence. You can write it straight into the property.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>Aside on print statements</h3>
+<ul>
+<li><code>$display</code> prints right away in the Active region. If the value it prints is set by a nonblocking assignment, it shows the old value.</li>
+<li><code>$write</code> is the same but adds no newline.</li>
+<li><code>$strobe</code> prints once, at the end of the time step in the Postponed region, so it shows final values.</li>
+<li><code>$monitor</code> is called once and then prints in Postponed every time one of its arguments changes. Only one $monitor is active at a time, and starting a new one replaces the old one.</li>
+</ul>
+<h3 id="step-4"><span class="stepno">Step 4</span>Reusability versus readability</h3>
+<p>You can name a sequence or property and give it arguments, then reuse it with different signals. That is reusable but you have to jump around to read it. Writing everything inline is easier to read once but cannot be reused.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>s_hs(req, ack, n):
+    req, then ack n clocks later
+
+p_hs(clk, req, ack):
+    on rising clk, when req rises, s_hs with n = 2 must follow
+
+check it twice:
+    bus 0 with req0 and ack0
+    bus 1 with req1 and ack1</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>sequence s_hs (req, ack, n);
+  req ##n ack;
+endsequence
+
+property p_hs (clk, req, ack);
+  @(posedge clk) $rose(req) |-&gt; s_hs(req, ack, 2);
+endproperty
+
+ap_bus0: assert property (p_hs(clk, req0, ack0));
+ap_bus1: assert property (p_hs(clk, req1, ack1));</code></pre></details></div>
+<h3 id="step-5"><span class="stepno">Step 5</span>Where the clock comes from</h3>
+<p>The clock can be written in the sequence, in the property, or in the assert itself. To avoid repeating it, declare a default clocking block, and every assertion without its own clock uses it.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the default clock for everything here is the rising clk
+
+ap1: uses the default clock
+     req means ack on the next clock
+
+ap2: overrides it with clk2
+     start means done 2 clocks later</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>default clocking cb @(posedge clk);
+endclocking
+
+ap1: assert property (req |=&gt; ack);                     <span class="c">// uses posedge clk</span>
+ap2: assert property (@(posedge clk2) start |-&gt; ##2 done); <span class="c">// overrides the default</span></code></pre></details></div>
+<p>The slides call this mix and match. You can override the default, or name a different clock inside a single property.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>Delays and ranges</h3>
+<ul>
+<li><code>a ##2 b</code> means b two clock edges after a.</li>
+<li><code>a ##[1:3] b</code> means b 1, 2 or 3 edges after a. Each choice is a separate possible match.</li>
+<li><code>a ##[1:$] b</code> means b at some later edge, with no upper limit. The $ means unbounded.</li>
+</ul>
+<figure class="fig"><svg viewBox="0 0 760 225" role="img" aria-label="Fixed delay versus a delay range"><path d="M170 30V214" class="grid dash"/><path d="M255 30V214" class="grid dash"/><path d="M340 30V214" class="grid dash"/><path d="M425 30V214" class="grid dash"/><path d="M510 30V214" class="grid dash"/><path d="M595 30V214" class="grid dash"/><path d="M680 30V214" class="grid dash"/><text x="170" y="22" font-size="14" text-anchor="middle" class="tm">0</text><text x="255" y="22" font-size="14" text-anchor="middle" class="tm">1</text><text x="340" y="22" font-size="14" text-anchor="middle" class="tm">2</text><text x="425" y="22" font-size="14" text-anchor="middle" class="tm">3</text><text x="510" y="22" font-size="14" text-anchor="middle" class="tm">4</text><text x="595" y="22" font-size="14" text-anchor="middle" class="tm">5</text><text x="680" y="22" font-size="14" text-anchor="middle" class="tm">6</text><text x="156" y="86" font-size="17" text-anchor="end" font-weight="700">a ##2 b</text><path d="M255 70L265 80L255 90L245 80Z" class="filla"/><path d="M425 70L435 80L425 90L415 80Z" class="fillg"/><text x="255" y="112" font-size="15" text-anchor="middle" class="tm">a</text><text x="425" y="112" font-size="15" text-anchor="middle" class="tm">b</text><text x="156" y="176" font-size="17" text-anchor="end" font-weight="700">a ##[1:3] b</text><rect x="322" y="154" width="206" height="40" rx="8" class="fillsoft"/><path d="M255 164L265 174L255 184L245 174Z" class="filla"/><text x="255" y="206" font-size="15" text-anchor="middle" class="tm">a</text><text x="425.0" y="210" font-size="14" text-anchor="middle" class="tm">b may come on any of these</text></svg><figcaption>##2 means exactly two edges later. ##[1:3] allows one, two or three edges later.</figcaption></figure>
+<h3 id="step-7"><span class="stepno">Step 7</span>A common fix, use $rose</h3>
+<p>What people often write first is <code>req |-&gt; ##[1:3] ack</code>. If req stays high for 5 cycles, that starts 5 separate checks, each wanting its own ack. What you usually mean is better written with $rose, so only the rising edge of req starts a check.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>only when req RISES:
+    ack must come within 1 to 3 clocks</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>ap_good: assert property (@(posedge clk) $rose(req) |-&gt; ##[1:3] ack);</code></pre></details></div>
+<p>The variants slides also show wrapping a common failure message in a macro so every assertion reports the same way.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>failmsg(msg): report an error with the time and msg
+
+ap_x: bus never contains X
+      if it does, report it with failmsg</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>`define failmsg(msg) $error(&quot;[%0t] FAILURE: %s&quot;, $time, msg)
+ap_x: assert property (@(posedge clk) !$isunknown(bus)) else `failmsg(&quot;bus has X&quot;);</code></pre></details></div>
+<h3 id="step-8"><span class="stepno">Step 8</span>disable iff is used once</h3>
+<p>disable iff can appear only once, at the top of a property. You cannot nest one inside a sequence or inside another disable iff. If you need several reset conditions, combine them in one expression, as in <code>disable iff (rst || test_mode)</code>.</p>
+<h3 id="step-9"><span class="stepno">Step 9</span>Binding properties to a design</h3>
+<p>bind attaches a module full of assertions to a design module without editing the design's source. The design team keeps clean RTL and the verification team keeps its checkers separate.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>a separate checker module with two rules   (off during rst):
+    if full, then no push
+    if empty, then no pop
+
+attach this checker to every fifo in the design,
+wiring its pins to the fifo&#x27;s signals by name</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>module fifo_props (input logic clk, rst, push, pop, full, empty);
+  ap_no_push_full: assert property (@(posedge clk) disable iff (rst) full |-&gt; !push);
+  ap_no_pop_empty: assert property (@(posedge clk) disable iff (rst) empty |-&gt; !pop);
+endmodule
+
+<span class="c">// every instance of fifo gets its own copy of the checker</span>
+bind fifo fifo_props u_props (.clk(clk), .rst(rst), .push(push),
+                              .pop(pop), .full(full), .empty(empty));</code></pre></details></div>
+<h3 id="step-10"><span class="stepno">Step 10</span>Consecutive repetition [*m]</h3>
+<p>&#91;*m] repeats a sequence m times with one clock between repeats.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>&quot;s2 four times in a row&quot; is just shorthand for
+writing s2 four times, one clock apart</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>s1 ##2 s2[*4] ##5 s3
+<span class="c">// is the same as</span>
+s1 ##2 s2 ##1 s2 ##1 s2 ##1 s2 ##5 s3</code></pre></details></div>
+<p>A range [*m:n] allows any count from m to n. For example <code>busy[*2:4]</code> means busy high for 2, 3 or 4 consecutive cycles.</p>
+<h3 id="step-11"><span class="stepno">Step 11</span>Non consecutive repetition [=m] and goto repetition [-&gt;m]</h3>
+<p>Both count occurrences that do not have to be back to back. They differ in where the sequence is allowed to end.</p>
+<figure class="fig"><svg viewBox="0 0 760 320" role="img" aria-label="Goto, nonconsecutive and consecutive repetition"><path d="M190 30V312" class="grid dash"/><path d="M238 30V312" class="grid dash"/><path d="M286 30V312" class="grid dash"/><path d="M334 30V312" class="grid dash"/><path d="M382 30V312" class="grid dash"/><path d="M430 30V312" class="grid dash"/><path d="M478 30V312" class="grid dash"/><path d="M526 30V312" class="grid dash"/><path d="M574 30V312" class="grid dash"/><path d="M622 30V312" class="grid dash"/><path d="M670 30V312" class="grid dash"/><path d="M718 30V312" class="grid dash"/><text x="190" y="22" font-size="14" text-anchor="middle" class="tm">1</text><text x="238" y="22" font-size="14" text-anchor="middle" class="tm">2</text><text x="286" y="22" font-size="14" text-anchor="middle" class="tm">3</text><text x="334" y="22" font-size="14" text-anchor="middle" class="tm">4</text><text x="382" y="22" font-size="14" text-anchor="middle" class="tm">5</text><text x="430" y="22" font-size="14" text-anchor="middle" class="tm">6</text><text x="478" y="22" font-size="14" text-anchor="middle" class="tm">7</text><text x="526" y="22" font-size="14" text-anchor="middle" class="tm">8</text><text x="574" y="22" font-size="14" text-anchor="middle" class="tm">9</text><text x="622" y="22" font-size="14" text-anchor="middle" class="tm">10</text><text x="670" y="22" font-size="14" text-anchor="middle" class="tm">11</text><text x="718" y="22" font-size="14" text-anchor="middle" class="tm">12</text><text x="176" y="68" font-size="16" text-anchor="end" font-weight="700">b</text><path d="M170 74H224V50H252V74H368V50H396V74H560V50H588V74H728" class="ln"/><text x="176" y="134" font-size="15" text-anchor="end" font-weight="700">b[-&gt;3] ##1 done</text><path d="M622 118L632 128L622 138L612 128Z" class="fillg"/><text x="638" y="134" font-size="14" text-anchor="start" class="tm">done exactly here</text><text x="176" y="200" font-size="15" text-anchor="end" font-weight="700">b[=3] ##1 done</text><rect x="606" y="178" width="128" height="42" rx="8" class="fillsoft"/><text x="596" y="205" font-size="14" text-anchor="end" class="tm">done anywhere here</text><text x="176" y="272" font-size="15" text-anchor="end" font-weight="700">c[*3]</text><rect x="272" y="256" width="124" height="26" rx="6" class="bxa"/><text x="406" y="275" font-size="14" text-anchor="start" class="tm">c high three clocks in a row</text></svg><figcaption>b is high at clocks 2, 5 and 9. The goto form needs done right after the third b. The [=3] form allows done later, as long as no fourth b comes first.</figcaption></figure>
+<ol>
+<li><code>b[-&gt;3]</code> (goto) means b is true 3 times, gaps allowed, and the sequence ends exactly on the third b.</li>
+<li><code>b[=3]</code> means b is true 3 times, gaps allowed, and the sequence may end on the third b or any later cycle, as long as b does not occur a fourth time.</li>
+</ol>
+<p>The difference shows when something follows.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>goto form [-&gt;3]:
+    after start rises, done comes EXACTLY one clock after the 3rd b
+
+nonconsecutive form [=3]:
+    done comes any time after the 3rd b,
+    as long as no 4th b shows up first</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>$rose(start) |-&gt; b[-&gt;3] ##1 done   <span class="c">// done must come the cycle right after the 3rd b</span>
+$rose(start) |-&gt; b[=3]  ##1 done   <span class="c">// done may come any time after the 3rd b, if no 4th b comes first</span></code></pre></details></div>
+<p>Ranges work too, as in <code>b[=2:4]</code> or <code>b[-&gt;1:3]</code>.</p>
+<p>The slide marked not obvious points out that <code>b[=0]</code> is an empty match. It means b does not occur at all.</p>
+<h3 id="step-12"><span class="stepno">Step 12</span>Combining sequences</h3>
+<ol>
+<li><code>cond throughout seq</code> means cond stays true on every cycle while seq is running. Example <code>en throughout (start ##[1:5] done)</code>.</li>
+<li><code>seq1 within seq2</code> means seq1 happens entirely inside the time span of seq2. It starts at or after seq2 starts and ends at or before seq2 ends.</li>
+<li><code>s1 and s2</code> means both must match, starting at the same time. They may end at different times, and the combined match ends when the later one ends.</li>
+<li><code>s1 intersect s2</code> is and with a length rule. Both must start and end at the same time.</li>
+<li><code>s1 or s2</code> means at least one matches. They do not need the same length.</li>
+<li><code>first_match(seq)</code> keeps only the earliest match of a sequence that could match in several ways, such as one with a ##[1:5] range.</li>
+<li><code>not prop</code> passes when prop fails.</li>
+<li><code>if (cond) prop1 else prop2</code> picks which property to check based on cond.</li>
+</ol>
+<figure class="fig"><svg viewBox="0 0 760 250" role="img" aria-label="throughout and within"><path d="M210 30V238" class="grid dash"/><path d="M280 30V238" class="grid dash"/><path d="M350 30V238" class="grid dash"/><path d="M420 30V238" class="grid dash"/><path d="M490 30V238" class="grid dash"/><path d="M560 30V238" class="grid dash"/><path d="M630 30V238" class="grid dash"/><path d="M700 30V238" class="grid dash"/><text x="210" y="22" font-size="14" text-anchor="middle" class="tm">1</text><text x="280" y="22" font-size="14" text-anchor="middle" class="tm">2</text><text x="350" y="22" font-size="14" text-anchor="middle" class="tm">3</text><text x="420" y="22" font-size="14" text-anchor="middle" class="tm">4</text><text x="490" y="22" font-size="14" text-anchor="middle" class="tm">5</text><text x="560" y="22" font-size="14" text-anchor="middle" class="tm">6</text><text x="630" y="22" font-size="14" text-anchor="middle" class="tm">7</text><text x="700" y="22" font-size="14" text-anchor="middle" class="tm">8</text><text x="196" y="66" font-size="16" text-anchor="end">start, done</text><path d="M210 51L219 60L210 69L201 60Z" class="filla"/><path d="M420 51L429 60L420 69L411 60Z" class="fillg"/><text x="196" y="112" font-size="16" text-anchor="end" font-weight="700">en</text><rect x="200" y="96" width="230" height="26" rx="6" class="bxg"/><text x="440" y="114" font-size="14" text-anchor="start" class="tm">en throughout the whole span</text><text x="196" y="178" font-size="16" text-anchor="end" font-weight="700">s2</text><rect x="200" y="162" width="510" height="26" rx="6" class="bx"/><text x="196" y="222" font-size="16" text-anchor="end" font-weight="700">s1</text><rect x="340" y="206" width="160" height="26" rx="6" class="bxa"/><text x="510" y="224" font-size="14" text-anchor="start" class="tm">s1 within s2</text></svg><figcaption>throughout keeps a condition true for every clock of a sequence. within places one sequence inside the time span of another.</figcaption></figure>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Using a level signal like req as an antecedent when you mean its rising edge.</li>
+<li>Mixing up [-&gt;m] and [=m] when something must follow immediately.</li>
+<li>Expecting intersect to accept sequences of different lengths.</li>
+<li>A vacuous pass, where the antecedent never fires and the assertion never really checks anything.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>Rewrite <code>a |=&gt; b</code> using only |-&gt; and ##.</div><details class="answer"><summary>Show answer</summary><div><p><code>a |-&gt; ##1 b</code></p></div></details></li>
+<li><div>req is high on cycles 1 through 4. How many checks does <code>req |-&gt; ##2 ack</code> start? How many does <code>$rose(req) |-&gt; ##2 ack</code> start?</div><details class="answer"><summary>Show answer</summary><div><p>Four checks, one per cycle req is high. Only one with $rose, at cycle 1.</p></div></details></li>
+<li><div>Write <code>a ##1 a ##1 a ##1 b</code> using a repetition operator.</div><details class="answer"><summary>Show answer</summary><div><p><code>a[*3] ##1 b</code></p></div></details></li>
+<li><div>b is high on cycles 2, 5 and 9, and done is high on cycle 10. Starting from cycle 1, does <code>b[-&gt;3] ##1 done</code> match? Does <code>b[=3] ##1 done</code> match?</div><details class="answer"><summary>Show answer</summary><div><p>Both match. The third b is at cycle 9 and done is at cycle 10.</p></div></details></li>
+<li><div>Same as problem 4 but done is high on cycle 12 instead. Which of the two match now?</div><details class="answer"><summary>Show answer</summary><div><p>Only <code>b[=3] ##1 done</code> matches, since no fourth b came before cycle 12. The goto form needs done at cycle 10.</p></div></details></li>
+<li><div>Sequence s1 lasts 3 cycles and s2 lasts 5 cycles, both starting together. Can <code>s1 and s2</code> match? Can <code>s1 intersect s2</code> match?</div><details class="answer"><summary>Show answer</summary><div><p>and can match, ending at cycle 5. intersect cannot, because the lengths differ.</p></div></details></li>
+<li><div>Write an assertion that once start rises, en must stay high on every cycle until done arrives within 1 to 8 cycles.</div><details class="answer"><summary>Show answer</summary><div><p><code>assert property (@(posedge clk) $rose(start) |-&gt; en throughout (##[1:8] done));</code></p></div></details></li>
+<li><div>Write a bind statement that attaches a checker module arb_props to every instance of a module named arbiter, connecting clk, req and gnt by name.</div><details class="answer"><summary>Show answer</summary><div><p><code>bind arbiter arb_props u_arb_props (.clk(clk), .req(req), .gnt(gnt));</code></p></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="14-16-advanced-assertions.html"><span class="dir">Previous</span>Lectures 14 to 16. Advanced Assertions</a><a class="next" href="19-clock-domain-crossing.html"><span class="dir">Next</span>Lecture 19. Clock Domain Crossing</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

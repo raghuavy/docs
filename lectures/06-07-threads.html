@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lectures 6 and 7. Threads and Interprocess Communication | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lectures 6 and 7</span>Threads and Interprocess Communication</h1><details class="toc"><summary>Steps in this lecture (9)</summary><ol><li><a href="#step-1">The three kinds of fork</a></li><li><a href="#step-2">Testbench blocks are transactors</a></li><li><a href="#step-3">The classic loop bug and automatic</a></li><li><a href="#step-4">Waiting for and stopping threads</a></li><li><a href="#step-5">Events</a></li><li><a href="#step-6">Waiting for several things</a></li><li><a href="#step-7">Semaphores</a></li><li><a href="#step-8">Mailboxes</a></li><li><a href="#step-9">Keeping producer and consumer in step</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">A testbench is many blocks running at the same time, such as a generator, a driver and a monitor. This lecture covers how to start those parallel threads and how they pass data and signals to each other. It follows chapter 7 of Spear and Tumbush.</p>
+<p>A thread is one independent flow of execution. Interprocess communication (IPC) is how threads exchange data and wait for each other. Every IPC setup has a producer thread that creates information, a consumer thread that uses it, and a channel between them.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>The three kinds of fork</h3>
+<p>Everything between fork and the join keyword runs in parallel. The join keyword decides when the parent continues.</p>
+<figure class="fig"><svg viewBox="0 0 760 290" role="img" aria-label="When the parent continues for join, join_any and join_none"><path d="M200 40H710" class="ln"/><path d="M200 34V46" class="ln"/><text x="200" y="26" font-size="15" text-anchor="middle" class="tm">0</text><path d="M300 34V46" class="ln"/><text x="300" y="26" font-size="15" text-anchor="middle" class="tm">5</text><path d="M400 34V46" class="ln"/><text x="400" y="26" font-size="15" text-anchor="middle" class="tm">10</text><path d="M500 34V46" class="ln"/><text x="500" y="26" font-size="15" text-anchor="middle" class="tm">15</text><path d="M600 34V46" class="ln"/><text x="600" y="26" font-size="15" text-anchor="middle" class="tm">20</text><path d="M700 34V46" class="ln"/><text x="700" y="26" font-size="15" text-anchor="middle" class="tm">25</text><text x="186" y="82" font-size="17" text-anchor="end">thread A</text><rect x="200" y="64" width="200" height="28" rx="6" class="bxa"/><text x="300" y="84" font-size="15" text-anchor="middle">#10</text><text x="186" y="122" font-size="17" text-anchor="end">thread B</text><rect x="200" y="104" width="400" height="28" rx="6" class="bxa"/><text x="400" y="124" font-size="15" text-anchor="middle">#20</text><text x="186" y="186" font-size="17" text-anchor="end" font-weight="700">join</text><path d="M200 180H600" class="grid"/><path d="M600 171L609 180L600 189L591 180Z" class="filla"/><text x="618" y="186" font-size="16" text-anchor="start" class="tm">continues at 20</text><text x="186" y="230" font-size="17" text-anchor="end" font-weight="700">join_any</text><path d="M200 224H400" class="grid"/><path d="M400 215L409 224L400 233L391 224Z" class="filla"/><text x="418" y="230" font-size="16" text-anchor="start" class="tm">continues at 10</text><text x="186" y="274" font-size="17" text-anchor="end" font-weight="700">join_none</text><path d="M200 268H200" class="grid"/><path d="M200 259L209 268L200 277L191 268Z" class="filla"/><text x="218" y="274" font-size="16" text-anchor="start" class="tm">continues at 0</text></svg><figcaption>Both threads start at time 0. The join keyword only decides when the code after the fork continues.</figcaption></figure>
+<ol>
+<li>fork ... join waits for all the child threads to finish.</li>
+<li>fork ... join_any waits for the first child to finish. The others keep running.</li>
+<li>fork ... join_none does not wait at all. The children start when the parent next blocks or ends its time step.</li>
+</ol>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>print &quot;start&quot; at time 0
+
+start two threads side by side:
+    A: wait 10, print &quot;A&quot;
+    B: wait 20, print &quot;B&quot;
+carry on as soon as EITHER one finishes   (join_any)
+
+print &quot;after fork&quot;        -&gt;  at time 10
+(B still prints later, at time 20)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>initial begin
+  $display(&quot;@%0t start&quot;, $time);
+  fork
+    #10 $display(&quot;@%0t A&quot;, $time);
+    #20 $display(&quot;@%0t B&quot;, $time);
+  join_any
+  $display(&quot;@%0t after fork&quot;, $time);
+end</code></pre></details></div>
+<p>With join_any this prints start at 0, A at 10, after fork at 10, then B at 20. With join, after fork would print at 20. With join_none, after fork prints at 0.</p>
+<h3 id="step-2"><span class="stepno">Step 2</span>Testbench blocks are transactors</h3>
+<p>The generator, agent, driver, monitor, checker and scoreboard are all transactors. A transactor is a loop that takes an object from the block before it, transforms it, and sends it to the block after it. Each one runs in its own thread.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>driver.run(): forever
+    get a transaction
+    drive it on the pins
+
+environment.run():
+    start gen.run() and drv.run() side by side
+    do not wait for them   (join_none)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class driver;
+  task run();
+    forever begin
+      <span class="c">// get a transaction, drive it on the pins</span>
+    end
+  endtask
+endclass
+
+class environment;
+  generator gen; driver drv;
+  task run();
+    fork
+      gen.run();
+      drv.run();
+    join_none
+  endtask
+endclass</code></pre></details></div>
+<p>Constructing the objects does not start any threads. Calling run() is what spawns them.</p>
+<p>Dynamic threads are threads created on the fly, for example one per transaction. How many are running at once depends on how fast each one finishes.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>The classic loop bug and automatic</h3>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>for j = 0, 1, 2:
+    queue up a thread that will print j   (it does not run yet)
+
+the loop finishes, so j is now 3
+wait a moment, the threads finally run   -&gt;  each prints 3</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>initial begin
+  for (int j = 0; j &lt; 3; j++)
+    fork
+      $write(&quot;%0d &quot;, j);
+    join_none
+  #0 $display;
+end</code></pre></details></div>
+<figure class="fig"><svg viewBox="0 0 760 265" role="img" aria-label="Loop variable shared by threads versus private copies"><text x="190" y="26" font-size="18" text-anchor="middle" font-weight="700">without automatic</text><text x="570" y="26" font-size="18" text-anchor="middle" font-weight="700">with automatic k = j</text><rect x="20" y="50" width="100" height="44" rx="10" class="bx"/><text x="70.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">thread 1</text><rect x="140" y="50" width="100" height="44" rx="10" class="bx"/><text x="190.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">thread 2</text><rect x="260" y="50" width="100" height="44" rx="10" class="bx"/><text x="310.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">thread 3</text><rect x="140" y="150" width="100" height="56" rx="10" class="bxw"/><text x="190.0" y="184.7" font-size="19" text-anchor="middle" font-weight="700">j = 3</text><path d="M70 94L170 150" class="ln" marker-end="url(#ah)"/><path d="M190 94V150" class="ln" marker-end="url(#ah)"/><path d="M310 94L210 150" class="ln" marker-end="url(#ah)"/><text x="190" y="248" font-size="18" text-anchor="middle" class="tw" font-weight="700">prints 3 3 3</text><rect x="400" y="50" width="100" height="44" rx="10" class="bx"/><text x="450.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">thread 1</text><rect x="400" y="150" width="100" height="56" rx="10" class="bxg"/><text x="450.0" y="184.7" font-size="19" text-anchor="middle" font-weight="700">k = 0</text><path d="M450 94V150" class="ln" marker-end="url(#ah)"/><rect x="520" y="50" width="100" height="44" rx="10" class="bx"/><text x="570.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">thread 2</text><rect x="520" y="150" width="100" height="56" rx="10" class="bxg"/><text x="570.0" y="184.7" font-size="19" text-anchor="middle" font-weight="700">k = 1</text><path d="M570 94V150" class="ln" marker-end="url(#ah)"/><rect x="640" y="50" width="100" height="44" rx="10" class="bx"/><text x="690.0" y="78.7" font-size="19" text-anchor="middle" font-weight="700">thread 3</text><rect x="640" y="150" width="100" height="56" rx="10" class="bxg"/><text x="690.0" y="184.7" font-size="19" text-anchor="middle" font-weight="700">k = 2</text><path d="M690 94V150" class="ln" marker-end="url(#ah)"/><text x="570" y="248" font-size="18" text-anchor="middle" font-weight="700">prints 0 1 2</text><path d="M380 20V250" class="grid"/></svg><figcaption>join_none threads run after the loop ends. Without a private copy they all read the final j.</figcaption></figure>
+<p>This prints 3 3 3, not 0 1 2. The join_none threads do not start until the loop has finished, and by then j is 3. All three threads read the same variable.</p>
+<p>The fix is an automatic copy made inside the fork. Automatic means the variable gets fresh storage for each thread instead of one shared copy.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>for j = 0, 1, 2:
+    queue up a thread with its OWN private copy k = j
+    that thread prints k
+
+-&gt;  prints 0 1 2</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>for (int j = 0; j &lt; 3; j++)
+  fork
+    automatic int k = j;
+    $write(&quot;%0d &quot;, k);
+  join_none</code></pre></details></div>
+<p>The same idea explains why testbench tasks are declared automatic. If a task is called twice at once, static storage would let the second call overwrite the first call's local variables.</p>
+<h3 id="step-4"><span class="stepno">Step 4</span>Waiting for and stopping threads</h3>
+<ul>
+<li>wait fork waits until every child spawned by the current thread is done.</li>
+<li>disable label stops one named block or thread.</li>
+<li>disable fork stops every child spawned by the current thread.</li>
+</ul>
+<p>A common pattern is a timeout. Start the real work and a timer with join_any, then kill whichever is still running.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>start two threads:
+    one waits for bus.done
+    one waits 1000 time units, then reports a timeout
+carry on when the first one finishes
+kill whichever is still running</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>fork : timeout_block
+  wait (bus.done);
+  #1000 $error(&quot;timeout&quot;);
+join_any
+disable fork;</code></pre></details></div>
+<p>One caution from the slides. If a task is spawned three times and one copy runs disable on the task name, all three copies die. Tasks inside separately constructed class objects do not have this problem.</p>
+<h3 id="step-5"><span class="stepno">Step 5</span>Events</h3>
+<p>An event is a handle to a synchronization object. One thread triggers it and another waits for it.</p>
+<ul>
+<li>-&gt;e triggers the event.</li>
+<li>@e waits for the trigger edge. It only catches triggers that happen after it starts waiting.</li>
+<li>wait (e.triggered) is level sensitive. It also catches a trigger that already happened in the current time step.</li>
+</ul>
+<p>In SystemVerilog you can pass an event into a task or a constructor, so objects can share events without global variables.</p>
+<p>The slides ask what happens here.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>start two threads together at time 0:
+    thread 1: wait 5, then wait for eventA&#x27;s &quot;triggered&quot; flag
+    thread 2: trigger eventA right now, at time 0
+
+the flag only stays up during time 0
+-&gt;  at time 5 thread 1 waits forever</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>event eventA;
+initial fork
+  #5 waitForTrigger(eventA);
+  -&gt;eventA;
+join
+
+task waitForTrigger (event eventA);
+  $display(&quot;[%0t] Waiting for EventA&quot;, $time);
+  wait (eventA.triggered);
+  $display(&quot;[%0t] EventA has triggered&quot;, $time);
+endtask</code></pre></details></div>
+<p>The trigger happens at time 0 and the wait starts at time 5. The triggered flag only lasts for the time step of the trigger, so the second message never prints. If the trigger came at time 5 and the wait started at time 0, both lines would print.</p>
+<p>A level sensitive wait inside a forever loop with no delay is a trap. The flag stays true for the rest of that time step, so the loop spins forever at zero time. Use @ instead, or add a delay.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>Waiting for several things</h3>
+<p>To wait for all generators to finish, the slides give three options.</p>
+<ol>
+<li>Spawn them all, then wait fork.</li>
+<li>Count how many done events have triggered.</li>
+<li>Count running threads, adding one when a thread starts and subtracting one when it ends.</li>
+</ol>
+<p>To continue after only m of n threads, give each thread a count = count + 1 at its end, then wait (count == m) and disable fork.</p>
+<h3 id="step-7"><span class="stepno">Step 7</span>Semaphores</h3>
+<p>A semaphore is a bucket of keys that guards a shared resource, such as a bus. A thread must get a key before using the resource and put it back afterward. With one key you get mutual exclusion, or mutex, meaning only one thread at a time.</p>
+<figure class="fig"><svg viewBox="0 0 760 215" role="img" aria-label="A semaphore with one key guarding a shared resource"><rect x="40" y="40" width="180" height="60" rx="10" class="bxa"/><text x="130.0" y="66.2" font-size="19" text-anchor="middle" font-weight="700">thread 1</text><text x="130.0" y="87.0" font-size="16" text-anchor="middle" class="tm">holds the key</text><rect x="40" y="130" width="180" height="60" rx="10" class="bx"/><text x="130.0" y="156.2" font-size="19" text-anchor="middle" font-weight="700">thread 2</text><text x="130.0" y="177.1" font-size="16" text-anchor="middle" class="tm">waits in get()</text><rect x="320" y="70" width="160" height="90" rx="10" class="bx"/><text x="400.0" y="111.2" font-size="19" text-anchor="middle" font-weight="700">room</text><text x="400.0" y="132.1" font-size="16" text-anchor="middle" class="tm">1 key</text><path d="M220 70H320" class="ln" marker-end="url(#ah)"/><path d="M220 160H270V140H320" class="ln dash" marker-end="url(#ah)"/><text x="510" y="100" font-size="17" text-anchor="start">when thread 1 calls put(),</text><text x="510" y="128" font-size="17" text-anchor="start">thread 2 gets the key</text></svg><figcaption>A one key semaphore lets only one thread use the resource at a time.</figcaption></figure>
+<ul>
+<li><code>semaphore sem = new(1);</code> creates it with 1 key.</li>
+<li>get(n) takes n keys and blocks until they are available.</li>
+<li>put(n) returns n keys.</li>
+<li>try_get(n) takes the keys if available and returns 1, or returns 0 right away without blocking.</li>
+</ul>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the room has 1 key
+
+use_room(id):
+    take the key   (wait here if someone else has it)
+    print that this id got the key
+    stay for 15 time units
+    give the key back</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>semaphore room = new(1);
+task automatic use_room (int id);
+  room.get(1);
+  $display(&quot;[%0t] key retrieved for %0d&quot;, $time, id);
+  #15;
+  room.put(1);
+endtask</code></pre></details></div>
+<p>Two cautions. Nothing stops you from putting back more keys than you took. And requests are not served in FIFO order, so a thread asking for 2 keys can be passed by a later thread asking for 1.</p>
+<h3 id="step-8"><span class="stepno">Step 8</span>Mailboxes</h3>
+<p>A mailbox is a FIFO channel between a producer and a consumer.</p>
+<figure class="fig"><svg viewBox="0 0 760 200" role="img" aria-label="Producer and consumer connected by a mailbox"><rect x="20" y="70" width="150" height="64" rx="10" class="bx"/><text x="95.0" y="108.7" font-size="19" text-anchor="middle" font-weight="700">producer</text><rect x="590" y="70" width="150" height="64" rx="10" class="bx"/><text x="665.0" y="108.7" font-size="19" text-anchor="middle" font-weight="700">consumer</text><text x="380" y="58" font-size="16" text-anchor="middle" class="tm">mailbox, first in first out</text><rect x="260" y="72" width="60" height="60" rx="0" class="bx"/><rect x="320" y="72" width="60" height="60" rx="0" class="bx"/><rect x="380" y="72" width="60" height="60" rx="0" class="bxa"/><rect x="440" y="72" width="60" height="60" rx="0" class="bxa"/><path d="M170 102H260" class="ln" marker-end="url(#ah)"/><path d="M500 102H590" class="ln" marker-end="url(#ah)"/><text x="215" y="92" font-size="15" text-anchor="middle" class="tm">put()</text><text x="545" y="92" font-size="15" text-anchor="middle" class="tm">get()</text><text x="380" y="178" font-size="16" text-anchor="middle" class="tm">put() waits while a bounded mailbox is full. get() waits while it is empty.</text></svg><figcaption>A mailbox is a queue of handles between two threads.</figcaption></figure>
+<ul>
+<li>new() makes an unbounded mailbox, and new(N) limits it to N items.</li>
+<li>put() adds an item and blocks if the mailbox is full.</li>
+<li>get() removes an item and blocks if it is empty.</li>
+<li>peek() copies the front item without removing it.</li>
+<li>try_put() and try_get() never block. They return 0 when they cannot act.</li>
+</ul>
+<p>A mailbox stores handles, not objects. That leads to a classic bug where the generator builds one object outside its loop and puts the same handle in every time, so every entry points to the last value.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the generator has a mailbox that only accepts Transactions
+
+run(n): repeat n times
+    build a BRAND NEW Transaction
+    randomize it
+    put its handle in the mailbox</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class generator;
+  mailbox #(Transaction) gen2drv;   <span class="c">// parameterized, one type only</span>
+  task run(int n);
+    repeat (n) begin
+      Transaction t = new();        <span class="c">// a new object every time</span>
+      assert(t.randomize());
+      gen2drv.put(t);
+    end
+  endtask
+endclass</code></pre></details></div>
+<p>The #(Transaction) part makes it a parameterized mailbox. The compiler then rejects any other type, which is good practice.</p>
+<h3 id="step-9"><span class="stepno">Step 9</span>Keeping producer and consumer in step</h3>
+<p>With an unbounded mailbox and no synchronization, the producer dumps all its items at once and the consumer removes them one by one later. Three ways to keep them in lockstep follow.</p>
+<ol>
+<li>Bounded mailbox of size 1 plus peek. The consumer peeks, processes, then calls get. Only then can the producer put the next item. The producer still ends up one item ahead.</li>
+<li>Mailbox plus a handshake event. The producer puts an item, then waits on the event. The consumer gets the item, processes it, then triggers the event.</li>
+<li>In option 2, an unbounded mailbox is not really needed, since at most one item is ever waiting.</li>
+</ol>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>producer: for i = 1, 2, 3
+    put i in the mailbox
+    wait until the consumer says it is done   (handshake)
+
+consumer: forever
+    take a value out   (wait if the mailbox is empty)
+    print it
+    trigger handshake</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>mailbox #(int) mbx = new();
+event handshake;
+
+initial for (int i = 1; i &lt; 4; i++) begin   <span class="c">// producer</span>
+  mbx.put(i);
+  @handshake;
+end
+
+initial forever begin                         <span class="c">// consumer</span>
+  int v;
+  mbx.get(v);
+  $display(&quot;got %0d&quot;, v);
+  -&gt;handshake;
+end</code></pre></details></div>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Loop variables read inside join_none without an automatic copy.</li>
+<li>Waiting with @ on an event that already fired in the same time step.</li>
+<li>One object reused for every mailbox put.</li>
+<li>A level sensitive wait in a zero delay loop.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>A fork has <code>#5 a();</code> and <code>#15 b();</code>. When does the code after it run for join, join_any and join_none?</div><details class="answer"><summary>Show answer</summary><div><p>After 15 for join, after 5 for join_any, and immediately at the current time for join_none.</p></div></details></li>
+<li><div>What does the loop in Step 3 print, and what one line fixes it?</div><details class="answer"><summary>Show answer</summary><div><p>It prints 3 3 3. Add <code>automatic int k = j;</code> inside the fork and print k.</p></div></details></li>
+<li><div>Thread X runs <code>-&gt;e;</code> at time 10. Thread Y runs <code>@e;</code> starting at time 10 but after X in the same time step. Does Y wake up? What if Y used <code>wait (e.triggered);</code>?</div><details class="answer"><summary>Show answer</summary><div><p>No, because @ only sees triggers after it starts waiting. Yes with wait (e.triggered), since the flag is still set in that time step.</p></div></details></li>
+<li><div>A semaphore was built with 2 keys. Thread A calls get(2) and holds them. Thread B calls try_get(1). What does B get back?</div><details class="answer"><summary>Show answer</summary><div><p>0, because no key is free and try_get does not block.</p></div></details></li>
+<li><div>A generator creates one Transaction before its repeat loop and inside the loop randomizes and puts it 5 times. What does the driver see?</div><details class="answer"><summary>Show answer</summary><div><p>Five handles to the same object, so it tends to see the last randomized values repeated.</p></div></details></li>
+<li><div>Write a fork that waits for whichever comes first, a done event or 500 time units, prints which one won, and kills the other.</div><details class="answer"><summary>Show answer</summary><div><p>One version is below.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>race two threads:
+    one waits for event done, then prints &quot;done first&quot;
+    one waits 500 time units, then prints &quot;timeout first&quot;
+carry on when either one finishes
+kill the other one</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>fork
+  begin @done;  $display(&quot;done first&quot;);    end
+  begin #500;   $display(&quot;timeout first&quot;); end
+join_any
+disable fork;</code></pre></details></div></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="05-interfaces.html"><span class="dir">Previous</span>Lecture 5. The Interface Construct</a><a class="next" href="08-uvm.html"><span class="dir">Next</span>Lecture 8. UVM</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>
