@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lectures 14 to 16. Advanced Assertions | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lectures 14 to 16</span>Advanced Assertions</h1><details class="toc"><summary>Steps in this lecture (10)</summary><ol><li><a href="#step-1">Fixes to the coverage lecture</a></li><li><a href="#step-2">Severity levels for failures</a></li><li><a href="#step-3">Built in functions for assertions</a></li><li><a href="#step-4">Two kinds of events in the simulator</a></li><li><a href="#step-5">The scheduling regions</a></li><li><a href="#step-6">Glitches</a></li><li><a href="#step-7">The three kinds of assertions</a></li><li><a href="#step-8">How deferral removes the false failure</a></li><li><a href="#step-9">Building a concurrent assertion</a></li><li><a href="#step-10">Implication</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">This deck starts by repeating the Lecture 10 slides, so read that section first. The new material answers a deeper question, which is exactly when in a time step an assertion looks at the signals. Once you know the simulator's scheduling regions, the three kinds of assertions and their glitch behavior make sense.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Fixes to the coverage lecture</h3>
+<p>Only sample() records coverage. start() and stop() just turn recording on and off, and any sample() call between a stop() and the next start() is ignored. The slides also clarify that a coverpoint can be an expression, as covered in Step 9 of Lectures 13 and 14.</p>
+<h3 id="step-2"><span class="stepno">Step 2</span>Severity levels for failures</h3>
+<p>A failing assertion reports at one of four levels. The default is error.</p>
+<ul>
+<li><code>$fatal(finish_number, "message", args)</code> ends the simulation.</li>
+<li><code>$error</code> reports an error and keeps going.</li>
+<li><code>$warning</code> reports a warning.</li>
+<li><code>$info</code> just prints a note.</li>
+</ul>
+<p>For <code>$fatal</code>, finish_number sets how much it prints on exit. 0 prints nothing extra, 1 adds the time and location, and 2 also adds CPU statistics.</p>
+<p><code>$assertoff</code> pauses assertions but lets any check already in progress finish. <code>$assertkill</code> pauses them and also kills checks in progress. <code>$asserton</code> turns them back on.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>Built in functions for assertions</h3>
+<p>Each comes with the slide's example.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>p_counter_inc   (off during reset)
+    if inc, then count = last clock&#x27;s count + 1
+
+p_handshake
+    when request rises, grant within 1 to 4 clocks
+
+p_req_drop   (off during rst)
+    one clock after ack, req has just fallen
+
+p_data_stable
+    if valid and not ready, then next clock
+    valid is still high and data has not changed
+
+at most 2 bits of gnt_bus are high
+
+cmd_bus never contains X or Z   (off during reset)
+    if it does, print an error with the time and the value
+
+exactly one bit of grant is high
+at most one bit of grant is high</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code><span class="c">// $past, the value on the previous clock edge</span>
+property p_counter_inc;
+  @(posedge clk) disable iff (reset)
+  inc |-&gt; (count == $past(count) + 1);
+endproperty
+
+<span class="c">// $rose, the LSB changed to 1 since the last edge</span>
+property p_handshake;
+  @(posedge clk) $rose(request) |-&gt; ##[1:4] grant;
+endproperty
+
+<span class="c">// $fell, the LSB changed to 0. One cycle after ack, req must drop</span>
+property p_req_drop;
+  @(posedge clk) disable iff (rst) ack |=&gt; $fell(req);
+endproperty
+
+<span class="c">// $stable, unchanged since the last edge</span>
+property p_data_stable;
+  @(posedge clk) (valid &amp;&amp; !ready) |=&gt; (valid &amp;&amp; $stable(data));
+endproperty
+
+<span class="c">// $countones, the number of 1 bits</span>
+assert property (@(posedge clk) $countones(gnt_bus) &lt;= 2);
+
+<span class="c">// $isunknown, true if any bit is X or Z</span>
+chk_cmd_valid: assert property (@(posedge clk) disable iff (reset)
+  !$isunknown(cmd_bus))
+  else $error(&quot;Time %0t cmd_bus has X or Z: %h&quot;, $time, cmd_bus);
+
+<span class="c">// $onehot, exactly one bit is 1. $onehot0, at most one bit is 1</span>
+assert property (@(posedge clk) $onehot(grant));     <span class="c">// 4 way arbiter, one winner</span>
+assert property (@(posedge clk) $onehot0(grant));    <span class="c">// also allows no winner when idle</span></code></pre></details></div>
+<p>The ##[1:4] in p_handshake is a range. grant must arrive 1, 2, 3 or 4 cycles later.</p>
+<h3 id="step-4"><span class="stepno">Step 4</span>Two kinds of events in the simulator</h3>
+<p>An update event is a change in a variable's value, such as a nonblocking assignment that changes a. An evaluation event is something that triggers other code to run, such as a rising edge of clk waking an always block.</p>
+<h3 id="step-5"><span class="stepno">Step 5</span>The scheduling regions</h3>
+<p>Each simulation time step is split into regions that run in a fixed order. Here is the normal flow.</p>
+<figure class="fig"><svg viewBox="0 0 760 190" role="img" aria-label="Scheduling regions inside one time step"><rect x="10" y="40" width="98" height="74" rx="10" class="bxa"/><text x="59.0" y="73.2" font-size="15" text-anchor="middle" font-weight="700">Preponed</text><text x="59.0" y="91.4" font-size="14" text-anchor="middle" class="tm">sample</text><rect x="116" y="40" width="98" height="74" rx="10" class="bx"/><text x="165.0" y="73.2" font-size="15" text-anchor="middle" font-weight="700">Active</text><text x="165.0" y="91.4" font-size="14" text-anchor="middle" class="tm">design</text><rect x="222" y="40" width="98" height="74" rx="10" class="bx"/><text x="271.0" y="73.2" font-size="15" text-anchor="middle" font-weight="700">Inactive</text><text x="271.0" y="91.4" font-size="14" text-anchor="middle" class="tm">#0</text><rect x="328" y="40" width="98" height="74" rx="10" class="bx"/><text x="377.0" y="73.2" font-size="15" text-anchor="middle" font-weight="700">NBA</text><text x="377.0" y="91.4" font-size="14" text-anchor="middle" class="tm">q &lt;= d</text><rect x="434" y="40" width="98" height="74" rx="10" class="bxa"/><text x="483.0" y="73.2" font-size="15" text-anchor="middle" font-weight="700">Observed</text><text x="483.0" y="91.4" font-size="14" text-anchor="middle" class="tm">assertions</text><rect x="540" y="40" width="98" height="74" rx="10" class="bx"/><text x="589.0" y="73.2" font-size="15" text-anchor="middle" font-weight="700">Reactive</text><text x="589.0" y="91.4" font-size="14" text-anchor="middle" class="tm">programs</text><rect x="646" y="40" width="98" height="74" rx="10" class="bx"/><text x="695.0" y="73.2" font-size="15" text-anchor="middle" font-weight="700">Postponed</text><text x="695.0" y="91.4" font-size="14" text-anchor="middle" class="tm">$strobe</text><path d="M10 146H744" class="ln" marker-end="url(#ah)"/><text x="377" y="174" font-size="16" text-anchor="middle" class="tm">one simulation time step, left to right</text></svg><figcaption>Assertions read values in Preponed and evaluate in Observed, so they never see a value halfway through a time step.</figcaption></figure>
+<ol>
+<li>Preponed. The instant just before anything changes. Assertions sample their signal values here, so they always see the settled values from the end of the previous step.</li>
+<li>Active. Design code runs here, such as continuous assignments, blocking assignments and the right hand sides of nonblocking assignments. Events in this queue run in any order.</li>
+<li>Inactive. Statements delayed by #0 wait here until the active queue empties, then move back to active.</li>
+<li>NBA. Nonblocking assignments update their left hand sides here, in the order they were written.</li>
+<li>Observed. Concurrent assertions, sequences and properties are evaluated here, using the values sampled in Preponed. Nothing changes value in this region.</li>
+<li>Reactive, Re-Inactive and Re-NBA. A mirror of the active set, used for testbench code in program blocks and checkers.</li>
+<li>Postponed. The very end of the step. Final deferred assertions, <code>$monitor</code> and <code>$strobe</code> run here.</li>
+</ol>
+<p>The flow is not strictly one way. If the reactive region changes a design signal, the simulator loops back to Active, which is where the complications come from.</p>
+<p>The slides walk through an example with a design module procReq, a test program, and a top module, placing each event in its region at time 0 and time 5. The rule to remember is that module assignments run in the Active set and program assignments run in the Reactive set.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>Glitches</h3>
+<p>Suppose <code>assign a = b | c;</code> and, at the same time, b goes from 1 to 0 while c goes from 0 to 1. a starts at 1 and ends at 1. But if the simulator updates b, then recomputes a, then updates c, a briefly reads 0 in between. That zero width pulse is a glitch, and it comes from a race between two events in the same region.</p>
+<figure class="fig"><svg viewBox="0 0 760 240" role="img" aria-label="A zero width glitch on a = b | c"><text x="136" y="58" font-size="17" text-anchor="end">b</text><path d="M150 40H400V68H700" class="ln"/><text x="136" y="128" font-size="17" text-anchor="end">c</text><path d="M150 138H400V110H700" class="ln"/><text x="136" y="198" font-size="17" text-anchor="end">a = b | c</text><path d="M150 180H700" class="ln"/><path d="M400 180V208H426V180" class="lnw dash"/><path d="M400 26V222" class="grid dash"/><text x="440" y="202" font-size="15" text-anchor="start" class="tw">zero width dip if b updates before c</text></svg><figcaption>b falls and c rises at the same time. a should stay 1, but the order of updates can make it read 0 for an instant.</figcaption></figure>
+<p>A check that runs in the middle of that order can report a failure that is not real.</p>
+<h3 id="step-7"><span class="stepno">Step 7</span>The three kinds of assertions</h3>
+<ol>
+<li>Immediate assertions use plain assert. They work like an if statement inside procedural code and run when control reaches them. They can report false failures from glitches.</li>
+<li>Deferred assertions are immediate assertions that wait before reporting. assert #0 is an observed deferred assertion. It filters glitches within one region set. assert final is a final deferred assertion, evaluated in Postponed, so it filters glitches across both the Active and Reactive sets. Both can sit inside or outside procedural code.</li>
+<li>Concurrent assertions use assert property. They are clocked, describe behavior over many cycles, and sample in Preponed. They can sit inside or outside procedural code, but never inside a function or task.</li>
+</ol>
+<p>The slides' immediate assertion example sits in an always_comb that reruns whenever a or b changes. It reports pass at times 0, 50, 150 and 190, and fail at 90. Since passes are expected, you usually print only failures.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>whenever a or b changes:
+    a must not be high while b is low
+    otherwise report &quot;a1 failed&quot;</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>always_comb
+  a1: assert (!(a &amp;&amp; !b)) else $error(&quot;a1 failed&quot;);</code></pre></details></div>
+<p>A trap the slides call short circuiting follows. In <code>assign ok = v &amp;&amp; check3bits(x);</code> once v is 0 the simulator never calls check3bits. Any assertion inside that function never runs, so its error can never appear.</p>
+<h3 id="step-8"><span class="stepno">Step 8</span>How deferral removes the false failure</h3>
+<p>At t = 50, suppose a becomes 1 a moment before b does.</p>
+<ol>
+<li>A plain immediate assertion runs as soon as a changes, sees a = 1 and b = 0, and reports a failure. Then b changes and it passes. You get one false failure plus a pass.</li>
+<li>With assert #0, the failure is put in a report queue instead of printed. When the assertion runs again after b changes, the earlier failure is flushed and only the pass is reported.</li>
+<li>With assert final, reporting waits until Postponed. This also handles the case where b is changed by a program in the Reactive set, which assert #0 cannot see past.</li>
+</ol>
+<p>Flushing also happens when the procedure hits an event control, such as a wait statement.</p>
+<h3 id="step-9"><span class="stepno">Step 9</span>Building a concurrent assertion</h3>
+<p>A concurrent assertion is built in three layers.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>sequence s_req_ack:
+    req, then ack 1 or 2 clocks later
+
+property p_req_ack   (off during rst):
+    whenever start is high, s_req_ack must follow
+
+assert the property every clock</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>sequence s_req_ack;
+  req ##[1:2] ack;              <span class="c">// events over time</span>
+endsequence
+
+property p_req_ack;
+  @(posedge clk) disable iff (rst)
+  start |-&gt; s_req_ack;          <span class="c">// built from sequences</span>
+endproperty
+
+chk_req_ack: assert property (p_req_ack);   <span class="c">// checked during simulation</span></code></pre></details></div>
+<ol>
+<li>A sequence lists expressions in clock order. ## is the cycle delay operator, so <code>a ##[1:2] b</code> means b follows a 1 or 2 clock edges later.</li>
+<li>A property combines sequences, usually with an implication.</li>
+<li>The assert statement checks the property every clock.</li>
+</ol>
+<p>In the label example <code>a1: assert property (@(posedge clk) disable iff (rst) a |-&gt; nexttime[2] b);</code>, the property is a |-&gt; nexttime[2] b, posedge clk is the clocking event, and rst is the disabling condition. nexttime[2] b means b at the second clock tick from now.</p>
+<p>A concurrent assertion with just a signal for its clock, like <code>a3: assert property (@clk a != b);</code>, is checked on every change of clk, both edges.</p>
+<h3 id="step-10"><span class="stepno">Step 10</span>Implication</h3>
+<ul>
+<li>In <code>A |-&gt; B</code>, A is the antecedent and B is the consequent. This overlapped form checks B starting on the same clock edge A matched.</li>
+<li>In <code>A |=&gt; B</code>, the non overlapped form, B is checked starting on the next clock edge.</li>
+<li>If A does not match, the implication is vacuously true. It passes without checking anything, so a property can pass all simulation while never really being tested.</li>
+</ul>
+<figure class="fig"><svg viewBox="0 0 760 230" role="img" aria-label="Overlapped and non overlapped implication"><path d="M200 30V222" class="grid dash"/><path d="M320 30V222" class="grid dash"/><path d="M440 30V222" class="grid dash"/><path d="M560 30V222" class="grid dash"/><path d="M680 30V222" class="grid dash"/><text x="200" y="22" font-size="14" text-anchor="middle" class="tm">edge 1</text><text x="320" y="22" font-size="14" text-anchor="middle" class="tm">edge 2</text><text x="440" y="22" font-size="14" text-anchor="middle" class="tm">edge 3</text><text x="560" y="22" font-size="14" text-anchor="middle" class="tm">edge 4</text><text x="680" y="22" font-size="14" text-anchor="middle" class="tm">edge 5</text><text x="186" y="74" font-size="17" text-anchor="end">A matches</text><path d="M320 58L330 68L320 78L310 68Z" class="filla"/><text x="186" y="140" font-size="17" text-anchor="end" font-weight="700">A |-&gt; B</text><path d="M320 124L330 134L320 144L310 134Z" class="fillg"/><text x="340" y="140" font-size="15" text-anchor="start" class="tm">B checked on the same edge</text><text x="186" y="206" font-size="17" text-anchor="end" font-weight="700">A |=&gt; B</text><path d="M440 190L450 200L440 210L430 200Z" class="fillg"/><text x="460" y="206" font-size="15" text-anchor="start" class="tm">B checked on the next edge</text></svg><figcaption>If A never matches, nothing is checked and the property passes vacuously.</figcaption></figure>
+<p>That last point is why cover property exists. It counts how many times a property actually matched, so you can see whether it was exercised.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>count how many times req is followed by ack 1 or 2 clocks later</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>c_req: cover property (@(posedge clk) req ##[1:2] ack);</code></pre></details></div>
+<p>Sequences can also be combined with the operators and, intersect, or, first_match, throughout and within, which the next lecture covers.</p>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Expecting an assertion to see a value assigned earlier in the same time step. Concurrent assertions see the Preponed values.</li>
+<li>Trusting a passing implication that was never triggered. Add a cover property.</li>
+<li>Putting an assertion inside a function that may be skipped by short circuit evaluation.</li>
+<li>Using plain immediate assertions on combinational signals and chasing glitch failures.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>Which severity task stops the simulation, and which is the default for a failed assertion?</div><details class="answer"><summary>Show answer</summary><div><p>$fatal stops it. The default severity is error.</p></div></details></li>
+<li><div>What is the difference between $assertoff and $assertkill?</div><details class="answer"><summary>Show answer</summary><div><p>$assertoff lets checks already running finish. $assertkill stops them immediately.</p></div></details></li>
+<li><div>An 8 bit grant bus is 8'b0000_0000. What do $onehot and $onehot0 return?</div><details class="answer"><summary>Show answer</summary><div><p>$onehot returns false and $onehot0 returns true.</p></div></details></li>
+<li><div>A nonblocking assignment q &lt;= d runs at a clock edge. Does a concurrent assertion at that same edge see the old q or the new q, and why?</div><details class="answer"><summary>Show answer</summary><div><p>The old q. Assertions sample in Preponed, before the NBA region updates q.</p></div></details></li>
+<li><div>Put these regions in order. Observed, NBA, Preponed, Postponed, Active, Reactive.</div><details class="answer"><summary>Show answer</summary><div><p>Preponed, Active, NBA, Observed, Reactive, Postponed.</p></div></details></li>
+<li><div>Write a property that if req rises, ack must be high within 1 to 3 cycles, disabled during rst. Then write a matching cover property for the req rising case.</div><details class="answer"><summary>Show answer</summary><div><p><code>assert property (@(posedge clk) disable iff (rst) $rose(req) |-&gt; ##[1:3] ack);</code> and <code>cover property (@(posedge clk) $rose(req));</code>.</p></div></details></li>
+<li><div>Explain why <code>assign ok = v &amp;&amp; check(x);</code> can hide an assertion failure inside check.</div><details class="answer"><summary>Show answer</summary><div><p>When v is 0, &amp;&amp; already knows the answer is 0, so check is never called and its assertion never runs.</p></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="13-14-coverage-in-depth.html"><span class="dir">Previous</span>Lectures 13 and 14. Functional Coverage in Depth</a><a class="next" href="16-18-sva.html"><span class="dir">Next</span>Lectures 16 to 18. SVA</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

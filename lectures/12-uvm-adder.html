@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 12. UVM Adder Example | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lecture 12</span>UVM Adder Example</h1><details class="toc"><summary>Steps in this lecture (11)</summary><ol><li><a href="#step-1">Lab 2 recap</a></li><li><a href="#step-2">The DUT and its interface</a></li><li><a href="#step-3">The sequence item</a></li><li><a href="#step-4">The sequence</a></li><li><a href="#step-5">The driver</a></li><li><a href="#step-6">The monitor</a></li><li><a href="#step-7">The agent</a></li><li><a href="#step-8">The predictor, a reference model</a></li><li><a href="#step-9">The scoreboard</a></li><li><a href="#step-10">Environment, test and top</a></li><li><a href="#step-11">Catching a planted bug</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">This lecture fills in the Lecture 8 templates with a complete, working UVM testbench for a 4 bit adder. Every piece is short, so it is the best place to see how the parts fit and where data flows.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>Lab 2 recap</h3>
+<p>Lab 2 was the scaffolding. It had a top, a package, a test and two components whose phases mostly printed messages. It showed the phase order without doing any real checking. This lecture puts real content into each placeholder.</p>
+<h3 id="step-2"><span class="stepno">Step 2</span>The DUT and its interface</h3>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>adder_if bundles:
+    a and b   4 bits each
+    sum       5 bits, so the carry out fits</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>interface adder_if;
+  logic [3:0] a;
+  logic [3:0] b;
+  logic [4:0] sum;     <span class="c">// 5 bits, so the carry out fits</span>
+endinterface</code></pre></details></div>
+<figure class="fig"><svg viewBox="0 0 760 235" role="img" aria-label="Four bit ripple carry adder"><rect x="30" y="90" width="130" height="70" rx="10" class="bx"/><text x="95.0" y="131.7" font-size="19" text-anchor="middle" font-weight="700">FA0</text><text x="95" y="56" font-size="15" text-anchor="middle" class="tm">a[0] b[0]</text><path d="M95 64V90" class="ln" marker-end="url(#ah)"/><path d="M95 160V196" class="ln" marker-end="url(#ah)"/><text x="95" y="218" font-size="15" text-anchor="middle" class="tm">sum[0]</text><path d="M160 125H210" class="ln" marker-end="url(#ah)"/><text x="185" y="117" font-size="14" text-anchor="middle" class="tm">c0</text><rect x="210" y="90" width="130" height="70" rx="10" class="bx"/><text x="275.0" y="131.7" font-size="19" text-anchor="middle" font-weight="700">FA1</text><text x="275" y="56" font-size="15" text-anchor="middle" class="tm">a[1] b[1]</text><path d="M275 64V90" class="ln" marker-end="url(#ah)"/><path d="M275 160V196" class="ln" marker-end="url(#ah)"/><text x="275" y="218" font-size="15" text-anchor="middle" class="tm">sum[1]</text><path d="M340 125H390" class="ln" marker-end="url(#ah)"/><text x="365" y="117" font-size="14" text-anchor="middle" class="tm">c1</text><rect x="390" y="90" width="130" height="70" rx="10" class="bx"/><text x="455.0" y="131.7" font-size="19" text-anchor="middle" font-weight="700">FA2</text><text x="455" y="56" font-size="15" text-anchor="middle" class="tm">a[2] b[2]</text><path d="M455 64V90" class="ln" marker-end="url(#ah)"/><path d="M455 160V196" class="ln" marker-end="url(#ah)"/><text x="455" y="218" font-size="15" text-anchor="middle" class="tm">sum[2]</text><path d="M520 125H570" class="ln" marker-end="url(#ah)"/><text x="545" y="117" font-size="14" text-anchor="middle" class="tm">c2</text><rect x="570" y="90" width="130" height="70" rx="10" class="bx"/><text x="635.0" y="131.7" font-size="19" text-anchor="middle" font-weight="700">FA3</text><text x="635" y="56" font-size="15" text-anchor="middle" class="tm">a[3] b[3]</text><path d="M635 64V90" class="ln" marker-end="url(#ah)"/><path d="M635 160V196" class="ln" marker-end="url(#ah)"/><text x="635" y="218" font-size="15" text-anchor="middle" class="tm">sum[3]</text><path d="M700 125H730V196" class="ln" marker-end="url(#ah)"/><text x="730" y="218" font-size="15" text-anchor="middle" class="tm">sum[4]</text><text x="12" y="130" font-size="15" text-anchor="start" class="tm">0</text><path d="M22 125H30" class="ln"/></svg><figcaption>Each full adder passes its carry to the next one. The last carry becomes sum bit 4.</figcaption></figure>
+<p>The adder is the ripple carry adder from Lecture 1. Four full adders are chained, each carry out feeding the next carry in, and the last carry out becomes sum[4].</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>full_adder:
+    sum       = a XOR b XOR carry_in
+    carry_out = 1 when at least two of a, b, carry_in are 1
+
+adder: chain four full adders
+    bit 0 gets carry_in 0
+    each next bit takes the previous bit&#x27;s carry_out
+    the last carry_out becomes sum bit 4</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>module full_adder (output sum, output c_out, input a, input b, input c_in);
+  assign sum   = a ^ b ^ c_in;
+  assign c_out = (a &amp; b) | ((a ^ b) &amp; c_in);
+endmodule
+
+module adder (adder_if vif);
+  wire [3:0] c_out;
+  full_adder f_ad0 (vif.sum[0], c_out[0], vif.a[0], vif.b[0], 1&#x27;b0);
+  full_adder f_ad1 (vif.sum[1], c_out[1], vif.a[1], vif.b[1], c_out[0]);
+  full_adder f_ad2 (vif.sum[2], c_out[2], vif.a[2], vif.b[2], c_out[1]);
+  full_adder f_ad3 (vif.sum[3], vif.sum[4], vif.a[3], vif.b[3], c_out[2]);
+endmodule</code></pre></details></div>
+<h3 id="step-3"><span class="stepno">Step 3</span>The sequence item</h3>
+<p>The transaction holds two random inputs and the result.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>adder_item: random a and b, plus sum
+
+do_copy(rhs):
+    turn the general handle into an adder_item handle
+        (report an error and stop if that is impossible)
+    copy the parent&#x27;s fields
+    copy a, b and sum
+
+convert2string:
+    give back text like &quot;A=3, B=4 | Sum=7&quot;</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class adder_item extends uvm_sequence_item;
+  `uvm_object_utils(adder_item)
+  rand logic [3:0] a;
+  rand logic [3:0] b;
+  logic [4:0] sum;
+
+  function new(string name = &quot;adder_item&quot;); super.new(name); endfunction
+
+  virtual function void do_copy(uvm_object rhs);
+    adder_item rhs_;
+    if (!$cast(rhs_, rhs)) begin
+      `uvm_error(&quot;ITEM_COPY&quot;, &quot;Cast failed in do_copy&quot;)
+      return;
+    end
+    super.do_copy(rhs);
+    this.a = rhs_.a; this.b = rhs_.b; this.sum = rhs_.sum;
+  endfunction
+
+  virtual function string convert2string();
+    return $sformatf(&quot;A=%0d, B=%0d | Sum=%0d&quot;, a, b, sum);
+  endfunction
+endclass</code></pre></details></div>
+<ol>
+<li>do_copy is the hook UVM calls when anyone runs copy() or clone() on this item. It receives a uvm_object handle, so it uses $cast to get an adder_item handle, the downcast from Lectures 9 to 11.</li>
+<li>convert2string returns a readable string. <code>$sformatf</code> formats text like $display but returns it instead of printing.</li>
+</ol>
+<h3 id="step-4"><span class="stepno">Step 4</span>The sequence</h3>
+<p>The sequence makes 10 random items. start_item waits until the driver is ready, and finish_item hands the item over and waits for item_done.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>body, repeat 10 times:
+    create an item
+    wait for the driver to be ready
+    randomize it   (error if that fails)
+    send it</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class adder_sequence extends uvm_sequence #(adder_item);
+  `uvm_object_utils(adder_sequence)
+  function new(string name = &quot;adder_sequence&quot;); super.new(name); endfunction
+
+  virtual task body();
+    adder_item item;
+    repeat (10) begin
+      item = adder_item::type_id::create(&quot;item&quot;);
+      start_item(item);
+      if (!item.randomize()) `uvm_error(&quot;SEQ&quot;, &quot;Randomization failed!&quot;)
+      finish_item(item);
+    end
+  endtask
+endclass</code></pre></details></div>
+<p>The sequencer itself needs no custom code. The agent simply uses <code>uvm_sequencer #(adder_item)</code>.</p>
+<h3 id="step-5"><span class="stepno">Step 5</span>The driver</h3>
+<p>The driver gets the virtual interface from the config database, then loops. It takes an item, puts a and b on the pins, waits 10 time units for the combinational adder to settle, and reports done.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>forever:
+    take the next item
+    put a and b on the pins
+    wait 10 time units for the adder to settle
+    report done</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>virtual task run_phase(uvm_phase phase);
+  adder_item item;
+  forever begin
+    seq_item_port.get_next_item(item);
+    vif.a = item.a;
+    vif.b = item.b;
+    #10;                           <span class="c">// time for the math and the sampling</span>
+    seq_item_port.item_done();
+  end
+endtask</code></pre></details></div>
+<p>There is no clock here because the adder is purely combinational, so the testbench paces itself with delays.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>The monitor</h3>
+<p>The monitor also waits 10 time units per item, then builds a fresh item from whatever is on the pins and broadcasts it through an analysis port.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>item_collected_port: a broadcast port, built in new
+
+forever:
+    wait 10 time units
+    create a fresh item
+    copy a, b and sum off the pins
+    broadcast it to every listener</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>uvm_analysis_port #(adder_item) item_collected_port;   <span class="c">// built in new()</span>
+
+virtual task run_phase(uvm_phase phase);
+  adder_item item;
+  forever begin
+    #10;
+    item = adder_item::type_id::create(&quot;item&quot;);
+    item.a   = vif.a;
+    item.b   = vif.b;
+    item.sum = vif.sum;
+    item_collected_port.write(item);
+  end
+endtask</code></pre></details></div>
+<p>Note that analysis ports are built with new in the constructor, not with the factory.</p>
+<h3 id="step-7"><span class="stepno">Step 7</span>The agent</h3>
+<p>The agent builds the driver, monitor and sequencer, then connects the driver's seq_item_port to the sequencer's seq_item_export.</p>
+<h3 id="step-8"><span class="stepno">Step 8</span>The predictor, a reference model</h3>
+<p>The predictor extends uvm_subscriber, which gives it a ready made analysis_export and asks for one write() function. Whenever the monitor broadcasts, write() runs automatically.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>whenever the monitor broadcasts an item t:
+    make a copy of t       (never change the original)
+    expected sum = a + b
+    send the copy to the scoreboard</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>virtual function void write(adder_item t);
+  adder_item expected_item;
+  $cast(expected_item, t.clone());   <span class="c">// copy, so the monitor&#x27;s item is untouched</span>
+  expected_item.sum = expected_item.a + expected_item.b;
+  results_port.write(expected_item);
+endfunction</code></pre></details></div>
+<p>clone() builds a new object and copies into it using do_copy. It returns a uvm_object handle, so $cast is needed again.</p>
+<h3 id="step-9"><span class="stepno">Step 9</span>The scoreboard</h3>
+<p>The scoreboard receives two streams, actual results from the monitor and expected results from the predictor. A component can only define one function named write, so the macro uvm_analysis_imp_decl creates two renamed versions.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>two separate inputs:
+    actual     from the monitor
+    expected   from the predictor
+two queues to hold them
+
+new: build both inputs
+
+write_actual(item):    add it to the actual queue, then try to compare
+write_expected(item):  add it to the expected queue, then try to compare
+
+compare:
+    if both queues have something:
+        take the oldest item from each
+        if the sums match exactly:  report MATCH
+        otherwise:                  report MISMATCH as an error</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>`uvm_analysis_imp_decl(_actual)
+`uvm_analysis_imp_decl(_expected)
+
+class adder_scoreboard extends uvm_scoreboard;
+  `uvm_component_utils(adder_scoreboard)
+  uvm_analysis_imp_actual   #(adder_item, adder_scoreboard) actual_imp;
+  uvm_analysis_imp_expected #(adder_item, adder_scoreboard) expected_imp;
+  adder_item actual_q[$], expected_q[$];
+
+  function new(string name = &quot;adder_scoreboard&quot;, uvm_component parent = null);
+    super.new(name, parent);
+    actual_imp   = new(&quot;actual_imp&quot;, this);
+    expected_imp = new(&quot;expected_imp&quot;, this);
+  endfunction
+
+  virtual function void write_actual(adder_item item);
+    actual_q.push_back(item);   compare_data();
+  endfunction
+
+  virtual function void write_expected(adder_item item);
+    expected_q.push_back(item); compare_data();
+  endfunction
+
+  virtual function void compare_data();
+    if (actual_q.size() &gt; 0 &amp;&amp; expected_q.size() &gt; 0) begin
+      adder_item act = actual_q.pop_front();
+      adder_item exp = expected_q.pop_front();
+      if (act.sum === exp.sum) `uvm_info(&quot;SB_PASS&quot;, &quot;MATCH&quot;, UVM_LOW)
+      else                     `uvm_error(&quot;SB_FAIL&quot;, &quot;MISMATCH&quot;)
+    end
+  endfunction
+endclass</code></pre></details></div>
+<p>The two queues line the streams up in order, and === compares including X and Z, so an X on the DUT output counts as a mismatch.</p>
+<h3 id="step-10"><span class="stepno">Step 10</span>Environment, test and top</h3>
+<p>The environment builds the agent, predictor and scoreboard, then makes three connections.</p>
+<ol>
+<li>Monitor port to the predictor's analysis_export.</li>
+<li>Monitor port to the scoreboard's actual_imp.</li>
+<li>Predictor results_port to the scoreboard's expected_imp.</li>
+</ol>
+<p>One analysis port feeds two listeners, which is exactly what analysis ports are for.</p>
+<p>The test raises an objection, starts the sequence on env.agent.sequencer, waits 10 more time units so the last item gets checked, and drops the objection.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>top:
+    make the interface and connect the adder to it
+    store the interface in the config database for everyone (&quot;*&quot;)
+    start adder_test</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>module top;
+  adder_if inf();
+  adder dut (.vif(inf));
+  initial begin
+    uvm_config_db #(virtual adder_if)::set(null, &quot;*&quot;, &quot;vif&quot;, inf);
+    run_test(&quot;adder_test&quot;);
+  end
+endmodule</code></pre></details></div>
+<p>Here the path is "*", so every component can get vif directly.</p>
+<h3 id="step-11"><span class="stepno">Step 11</span>Catching a planted bug</h3>
+<p>The last slide changes one connection. Stage 2 takes c_out[0] as its carry in instead of c_out[1]. The scoreboard then reports MISMATCH for inputs where those two carries differ. That is the whole point, a wiring mistake found automatically, without anyone checking waveforms.</p>
+<figure class="fig"><svg viewBox="0 0 760 235" role="img" aria-label="Ripple carry adder with the planted bug"><rect x="30" y="90" width="130" height="70" rx="10" class="bx"/><text x="95.0" y="131.7" font-size="19" text-anchor="middle" font-weight="700">FA0</text><text x="95" y="56" font-size="15" text-anchor="middle" class="tm">a[0] b[0]</text><path d="M95 64V90" class="ln" marker-end="url(#ah)"/><path d="M95 160V196" class="ln" marker-end="url(#ah)"/><text x="95" y="218" font-size="15" text-anchor="middle" class="tm">sum[0]</text><path d="M160 125H210" class="ln" marker-end="url(#ah)"/><text x="185" y="117" font-size="14" text-anchor="middle" class="tm">c0</text><rect x="210" y="90" width="130" height="70" rx="10" class="bx"/><text x="275.0" y="131.7" font-size="19" text-anchor="middle" font-weight="700">FA1</text><text x="275" y="56" font-size="15" text-anchor="middle" class="tm">a[1] b[1]</text><path d="M275 64V90" class="ln" marker-end="url(#ah)"/><path d="M275 160V196" class="ln" marker-end="url(#ah)"/><text x="275" y="218" font-size="15" text-anchor="middle" class="tm">sum[1]</text><path d="M340 125H390" class="ln dash"/><text x="365" y="182" font-size="13" text-anchor="middle" class="tm">c1 unused</text><rect x="390" y="90" width="130" height="70" rx="10" class="bxw"/><text x="455.0" y="131.7" font-size="19" text-anchor="middle" font-weight="700">FA2</text><text x="455" y="56" font-size="15" text-anchor="middle" class="tm">a[2] b[2]</text><path d="M455 64V90" class="ln" marker-end="url(#ah)"/><path d="M455 160V196" class="ln" marker-end="url(#ah)"/><text x="455" y="218" font-size="15" text-anchor="middle" class="tm">sum[2]</text><path d="M520 125H570" class="ln" marker-end="url(#ah)"/><text x="545" y="117" font-size="14" text-anchor="middle" class="tm">c2</text><rect x="570" y="90" width="130" height="70" rx="10" class="bx"/><text x="635.0" y="131.7" font-size="19" text-anchor="middle" font-weight="700">FA3</text><text x="635" y="56" font-size="15" text-anchor="middle" class="tm">a[3] b[3]</text><path d="M635 64V90" class="ln" marker-end="url(#ah)"/><path d="M635 160V196" class="ln" marker-end="url(#ah)"/><text x="635" y="218" font-size="15" text-anchor="middle" class="tm">sum[3]</text><path d="M700 125H730V196" class="ln" marker-end="url(#ah)"/><text x="730" y="218" font-size="15" text-anchor="middle" class="tm">sum[4]</text><text x="12" y="130" font-size="15" text-anchor="start" class="tm">0</text><path d="M22 125H30" class="ln"/><path d="M160 104H180V76H375V104H390" class="lnw" marker-end="url(#ahw)"/><text x="270" y="30" font-size="14" text-anchor="middle" class="tw" font-weight="700">c0 wired to FA2 by mistake</text></svg><figcaption>Stage 2 takes c0 instead of c1. Inputs where those two carries differ give a wrong sum, and the scoreboard flags them.</figcaption></figure>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Modifying the monitor's item in the predictor instead of a clone. The expected and actual items would become the same object and every check would pass.</li>
+<li>Dropping the objection right after the sequence, before the last result is compared.</li>
+<li>Two write functions in one component without uvm_analysis_imp_decl.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>Why is sum 5 bits wide while a and b are 4 bits?</div><details class="answer"><summary>Show answer</summary><div><p>Two 4 bit numbers can add to at most 30, which needs 5 bits.</p></div></details></li>
+<li><div>With a = 9 and b = 8, what does the predictor put in sum, in decimal and binary?</div><details class="answer"><summary>Show answer</summary><div><p>17, which is 5'b10001.</p></div></details></li>
+<li><div>Why does the monitor wait #10 before sampling?</div><details class="answer"><summary>Show answer</summary><div><p>The driver applies inputs and the combinational logic needs time to settle before the sum is valid.</p></div></details></li>
+<li><div>In the bugged adder, find the DUT output for a = 2 and b = 2. Does the scoreboard pass or fail?</div><details class="answer"><summary>Show answer</summary><div><p>Bit 1 makes a carry, but stage 2 takes carry 0, which is 0. The DUT outputs 0 instead of 4, so the scoreboard fails.</p></div></details></li>
+<li><div>Give one input pair that passes even with the bug, and explain why.</div><details class="answer"><summary>Show answer</summary><div><p>a = 3 and b = 0. No stage makes a carry, so c_out[0] and c_out[1] are both 0 and the wrong wire carries the right value.</p></div></details></li>
+<li><div>Why must the predictor work on t.clone() instead of t?</div><details class="answer"><summary>Show answer</summary><div><p>The monitor's item is also going to the scoreboard. Changing it would change the actual value, and the comparison would test nothing.</p></div></details></li>
+<li><div>Add a functional coverage subscriber that covers a and b with 4 bins each and their cross. Show its write().</div><details class="answer"><summary>Show answer</summary><div><p>One version is below.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>adder_cov listens to the monitor
+
+covergroup:
+    a sorted into 4 bins
+    b sorted into 4 bins
+    every (a bin, b bin) pair, 16 in all
+
+new:       build the covergroup
+write(t):  remember t, take a coverage snapshot</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class adder_cov extends uvm_subscriber #(adder_item);
+  `uvm_component_utils(adder_cov)
+  adder_item it;
+  covergroup cg;
+    cp_a : coverpoint it.a { option.auto_bin_max = 4; }
+    cp_b : coverpoint it.b { option.auto_bin_max = 4; }
+    axb  : cross cp_a, cp_b;
+  endgroup
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    cg = new();
+  endfunction
+  virtual function void write(adder_item t);
+    it = t;
+    cg.sample();
+  endfunction
+endclass</code></pre></details></div></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="10-assertions-basics.html"><span class="dir">Previous</span>Lecture 10. Assertions Basics</a><a class="next" href="12-advanced-interfaces.html"><span class="dir">Next</span>Lecture 12. Advanced Interfaces</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 5. The Interface Construct | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lecture 5</span>The Interface Construct</h1><details class="toc"><summary>Steps in this lecture (7)</summary><ol><li><a href="#step-1">The layered testbench</a></li><li><a href="#step-2">The problem with plain ports</a></li><li><a href="#step-3">An interface is a bundle of wires</a></li><li><a href="#step-4">Modports give directions</a></li><li><a href="#step-5">Clocking blocks</a></li><li><a href="#step-6">The progression in the summary slides</a></li><li><a href="#step-7">The ATM router example</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">An interface bundles the wires between the testbench and the DUT into one named object. You change a signal in one place instead of three, and you can attach directions and timing to the bundle. The lecture follows chapters 1 and 4 of Spear and Tumbush.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>The layered testbench</h3>
+<p>The first slides show how a testbench is organized as layers, from raw wires up to the test itself. Each layer only talks to the layers next to it.</p>
+<figure class="fig"><svg viewBox="0 0 760 395" role="img" aria-label="Layered testbench, from test down to signals"><rect x="20" y="16" width="720" height="62" rx="10" class="bx"/><text x="40" y="54" font-size="19" text-anchor="start" font-weight="700">Test layer</text><text x="300" y="54" font-size="18" text-anchor="start">the test, functional coverage</text><rect x="20" y="90" width="720" height="62" rx="10" class="bx"/><text x="40" y="128" font-size="19" text-anchor="start" font-weight="700">Scenario layer</text><text x="300" y="128" font-size="18" text-anchor="start">generator</text><rect x="20" y="164" width="720" height="62" rx="10" class="bx"/><text x="40" y="202" font-size="19" text-anchor="start" font-weight="700">Functional layer</text><text x="300" y="202" font-size="18" text-anchor="start">agent, scoreboard, checker</text><rect x="20" y="238" width="720" height="62" rx="10" class="bx"/><text x="40" y="276" font-size="19" text-anchor="start" font-weight="700">Command layer</text><text x="300" y="276" font-size="18" text-anchor="start">driver, monitor, assertions</text><rect x="20" y="312" width="720" height="62" rx="10" class="bxa"/><text x="40" y="350" font-size="19" text-anchor="start" font-weight="700">Signal layer</text><text x="300" y="350" font-size="18" text-anchor="start">the DUT and its wires</text></svg><figcaption>Each layer talks only to its neighbors. The test sits on top, the DUT at the bottom.</figcaption></figure>
+<ol>
+<li>Signal layer. The DUT and the wires connected to it.</li>
+<li>Command layer. A driver turns a command like write 5 to address 3 into pin wiggles. A monitor does the reverse, watching pins and rebuilding transactions. Assertions also live here.</li>
+<li>Functional layer. An agent breaks big transactions into commands. A scoreboard predicts the expected results, and a checker compares them with what the monitor saw.</li>
+<li>Scenario layer. A generator creates sequences of transactions that mimic real use.</li>
+<li>Test layer. The test configures everything below it, and functional coverage measures progress.</li>
+</ol>
+<p>You can also replace parts of the system with behavioral models, meaning simple code that acts like a block without being the real RTL.</p>
+<h3 id="step-2"><span class="stepno">Step 2</span>The problem with plain ports</h3>
+<p>The running example is an arbiter with clk, rst, a 2 bit request and a 2 bit grant. With plain ports, the same signal list appears in the DUT, the testbench and the top module. Adding one signal means editing all three, and a typo in one place breaks the connection.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>An interface is a bundle of wires</h3>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>interface arb_if: one bundle holding grant, request and rst
+                  the clock comes in from outside
+
+DUT arb, at a rising clk or a rising rst:
+    if rst:                    grant = 00
+    else if request bit 0:     grant = 01
+    else if request bit 1:     grant = 10
+    else:                      grant = 00
+
+top:
+    make a clock that flips every 5 time units
+    make ONE bundle called arbif
+    plug the DUT and the testbench into that same bundle</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>interface arb_if (input bit clk);
+  logic [1:0] grant, request;
+  logic       rst;
+endinterface
+
+module arb (arb_if arbif);           <span class="c">// simple fixed priority arbiter</span>
+  always @(posedge arbif.clk or posedge arbif.rst)
+    if (arbif.rst)                arbif.grant &lt;= &#x27;0;
+    else if (arbif.request[0])    arbif.grant &lt;= 2&#x27;b01;
+    else if (arbif.request[1])    arbif.grant &lt;= 2&#x27;b10;
+    else                          arbif.grant &lt;= &#x27;0;
+endmodule
+
+module top;
+  bit clk;
+  always #5 clk = ~clk;
+  arb_if arbif (clk);   <span class="c">// one instance of the bundle</span>
+  arb    a1 (arbif);    <span class="c">// DUT</span>
+  test   t1 (arbif);    <span class="c">// testbench</span>
+endmodule</code></pre></details></div>
+<figure class="fig"><svg viewBox="0 0 760 275" role="img" aria-label="Separate wires compared with one interface"><rect x="20" y="40" width="110" height="190" rx="10" class="bx"/><text x="75.0" y="141.7" font-size="19" text-anchor="middle" font-weight="700">test</text><rect x="250" y="40" width="110" height="190" rx="10" class="bx"/><text x="305.0" y="141.7" font-size="19" text-anchor="middle" font-weight="700">arb</text><path d="M130 80H250" class="ln"/><text x="190" y="73" font-size="15" text-anchor="middle" class="tm">clk</text><path d="M130 118H250" class="ln"/><text x="190" y="111" font-size="15" text-anchor="middle" class="tm">rst</text><path d="M130 156H250" class="ln"/><text x="190" y="149" font-size="15" text-anchor="middle" class="tm">request</text><path d="M130 194H250" class="ln"/><text x="190" y="187" font-size="15" text-anchor="middle" class="tm">grant</text><rect x="400" y="40" width="110" height="190" rx="10" class="bx"/><text x="455.0" y="141.7" font-size="19" text-anchor="middle" font-weight="700">test</text><rect x="630" y="40" width="110" height="190" rx="10" class="bx"/><text x="685.0" y="141.7" font-size="19" text-anchor="middle" font-weight="700">arb</text><rect x="510" y="110" width="120" height="50" rx="10" class="bxa"/><text x="570.0" y="141.7" font-size="19" text-anchor="middle" font-weight="700">arb_if</text><text x="190" y="262" font-size="16" text-anchor="middle" class="tm">plain ports: 4 separate wires</text><text x="570" y="262" font-size="16" text-anchor="middle" class="tm">one interface, one connection</text></svg><figcaption>With an interface, adding a signal means editing one place instead of three.</figcaption></figure>
+<p>Everyone reaches a signal as arbif.name. The clock comes in as an interface port so every user shares it.</p>
+<p>If the DUT is an older design with ordinary ports, you can still connect it by pulling the signals out of the interface.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the old DUT has normal ports, so connect each port
+by pulling the matching wire out of the bundle by name</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>arb_port a1 (.grant(arbif.grant), .request(arbif.request),
+             .rst(arbif.rst), .clk(arbif.clk));</code></pre></details></div>
+<h3 id="step-4"><span class="stepno">Step 4</span>Modports give directions</h3>
+<p>A modport is a named view of the interface that lists which signals are inputs and outputs for one user. It stops the testbench from accidentally driving a DUT output.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>same bundle as before, plus three named views:
+    TEST     may drive request and rst, may only read grant and clk
+    DUT      reads request, rst, clk and drives grant
+    MONITOR  reads everything and drives nothing
+
+the DUT module takes the DUT view</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>interface arb_if (input bit clk);
+  logic [1:0] grant, request;
+  logic rst;
+  modport TEST    (output request, rst, input grant, clk);
+  modport DUT     (input request, rst, clk, output grant);
+  modport MONITOR (input request, grant, rst, clk);
+endinterface
+
+module arb (arb_if.DUT arbif);   <span class="c">// the DUT uses the DUT view</span></code></pre></details></div>
+<p>A monitor only watches, so its modport is all inputs.</p>
+<p>When every port name matches the signal name in the parent, .* connects them all at once, as in <code>arb a1 (.*);</code>.</p>
+<h3 id="step-5"><span class="stepno">Step 5</span>Clocking blocks</h3>
+<p>A clocking block states when synchronous signals are sampled and driven relative to a clock. It is for testbenches and is not synthesizable.</p>
+<figure class="fig"><svg viewBox="0 0 760 280" role="img" aria-label="Clocking block sample and drive timing"><text x="116" y="52" font-size="17" text-anchor="end">clk</text><text x="116" y="122" font-size="17" text-anchor="end">grant</text><text x="116" y="192" font-size="17" text-anchor="end">request</text><path d="M130 28V214" class="grid dash"/><path d="M280 28V214" class="grid dash"/><path d="M430 28V214" class="grid dash"/><path d="M580 28V214" class="grid dash"/><path d="M730 28V214" class="grid dash"/><path d="M130 60V32H205.0V60H280V32H355.0V60H430V32H505.0V60H580V32H655.0V60H730" class="ln"/><path d="M130 132H350V104H730" class="ln"/><path d="M130 202H444V174H594V202H730" class="ln"/><circle cx="268" cy="132" r="6" class="filla"/><circle cx="418" cy="118" r="6" class="filla"/><circle cx="568" cy="118" r="6" class="filla"/><path d="M444 180L452 188L444 196L436 188Z" class="filla"/><path d="M594 180L602 188L594 196L586 188Z" class="filla"/><text x="130" y="244" font-size="16" text-anchor="start" class="tm">dot: cb samples grant just before the edge</text><text x="130" y="268" font-size="16" text-anchor="start" class="tm">diamond: cb drives request just after the edge</text></svg><figcaption>Sampling before the edge and driving after it means the testbench and the DUT never race on the same edge.</figcaption></figure>
+<ul>
+<li>An interface can hold more than one, one per clock domain.</li>
+<li>It can trigger on one edge, as in @(posedge clk), or both edges, as in @(clk).</li>
+</ul>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>same bundle, plus a clocking block cb tied to the rising clk:
+    request is DRIVEN at the clock edge
+    grant is SAMPLED at the clock edge
+
+TEST view: go through cb, and drive rst directly (not clocked)
+DUT view:  unchanged</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>interface arb_if (input bit clk);
+  logic [1:0] grant, request;
+  logic rst;
+
+  clocking cb @(posedge clk);
+    output request;   <span class="c">// driven on the clock edge</span>
+    input  grant;     <span class="c">// sampled on the clock edge</span>
+  endclocking
+
+  modport TEST (clocking cb, output rst);  <span class="c">// rst stays asynchronous</span>
+  modport DUT  (input request, rst, clk, output grant);
+endinterface</code></pre></details></div>
+<p>The testbench then talks through cb.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the testbench uses the TEST view
+
+at the next clock edge, drive request = 01
+wait for the next clock edge
+print grant, as sampled at that edge</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>program automatic test (arb_if.TEST arbif);
+  initial begin
+    arbif.cb.request &lt;= 2&#x27;b01;   <span class="c">// drive at the next posedge</span>
+    @arbif.cb;                   <span class="c">// wait for the clocking event</span>
+    $display(&quot;grant = %b&quot;, arbif.cb.grant);
+  end
+endprogram</code></pre></details></div>
+<p>Why this matters. Without a clocking block, the testbench and the DUT can both act at the exact same clock edge, and the result depends on which runs first. That is a race condition. The clocking block samples inputs just before the edge and drives outputs just after, so the order no longer matters.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>The progression in the summary slides</h3>
+<ol>
+<li>Arbiter with plain ports.</li>
+<li>Arbiter with an interface.</li>
+<li>Interface plus modports.</li>
+<li>Interface plus modports plus a clocking block. This is the version the slides call the better one.</li>
+</ol>
+<h3 id="step-7"><span class="stepno">Step 7</span>The ATM router example</h3>
+<p>ATM sends data in fixed size cells in time slots. Any user can take any empty slot, so no slot belongs to a particular user.</p>
+<p>The example is a router with 4 receive ports and 4 transmit ports that follow the UTOPIA interface standard. In Verilog 1995 style, every port of every channel is listed by hand, which takes several slides of code.</p>
+<p>With interfaces, one receive interface and one transmit interface are written once, each with its own clocking block and modports. The DUT then takes eight interface ports instead of dozens of wires.</p>
+<p>The testbench slides show only channel 0, and the same code would be copied for channels 1 to 3. The slides point out that virtual interfaces, covered later, remove that copying.</p>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Driving a signal through the wrong modport. The compiler catches it, which is the point.</li>
+<li>Reading a DUT output directly instead of through cb, which brings the race back.</li>
+<li>Putting an asynchronous signal like rst inside the clocking block.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>Which testbench layer does a driver belong to, and which does a scoreboard belong to?</div><details class="answer"><summary>Show answer</summary><div><p>A driver is in the command layer. A scoreboard is in the functional layer.</p></div></details></li>
+<li><div>In the TEST modport above, why is rst listed outside the clocking block?</div><details class="answer"><summary>Show answer</summary><div><p>rst is asynchronous, so it should not be tied to the clock edge.</p></div></details></li>
+<li><div>Write an interface named bus_if with a clock port and signals valid, ready and data[7:0], plus a master modport and a slave modport.</div><details class="answer"><summary>Show answer</summary><div><p>One version is below.</p></div></details></li>
+<li><div>Using the clocking block above, write code that drives request to 2'b10, then waits until grant equals 2'b10.</div><details class="answer"><summary>Show answer</summary><div><p><code>arbif.cb.request &lt;= 2'b10; wait (arbif.cb.grant == 2'b10);</code> or loop on <code>@arbif.cb</code> until it matches.</p></div></details></li>
+<li><div>A DUT is declared <code>module arb (arb_if.TEST arbif);</code> and assigns arbif.grant. What goes wrong and how do you fix it?</div><details class="answer"><summary>Show answer</summary><div><p>TEST gives the DUT the testbench's view, where grant can only be read. Compile fails. Use arb_if.DUT.</p></div></details></li>
+<li><div>Add a clocking block named cb to your bus_if from problem 3 for the master side, driving valid and data and sampling ready.</div><details class="answer"><summary>Show answer</summary><div><p>Shown in the same block below.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>bus_if bundles valid, ready and an 8 bit data, clock comes in
+
+clocking block cb on the rising clk:
+    drive valid and data
+    sample ready
+
+master view: goes through cb
+slave view:  reads valid, data and clk, drives ready</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>interface bus_if (input bit clk);
+  logic       valid, ready;
+  logic [7:0] data;
+
+  clocking cb @(posedge clk);
+    output valid, data;
+    input  ready;
+  endclocking
+
+  modport master (clocking cb);
+  modport slave  (input valid, data, clk, output ready);
+endinterface</code></pre></details></div></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="04-coverage-basics.html"><span class="dir">Previous</span>Lecture 4. Functional Coverage Basics</a><a class="next" href="06-07-threads.html"><span class="dir">Next</span>Lectures 6 and 7. Threads and Interprocess Communication</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>

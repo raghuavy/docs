@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lectures 9 to 11. Advanced OOP and Testbench Guidelines | EE 8350 Guide</title>
+<script>try{var s=localStorage.getItem("ee8350-size");if(s)document.documentElement.setAttribute("data-size",s);}catch(e){}</script>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site">
+  <a class="home" href="../index.html">EE 8350 Guide</a>
+  <div class="sizer" role="group" aria-label="Text size">
+    <span>Text</span>
+    <button type="button" data-size="1" aria-label="Smaller text">A</button>
+    <button type="button" data-size="2" aria-label="Normal text">A</button>
+    <button type="button" data-size="3" aria-label="Larger text">A</button>
+  </div>
+</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker><marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="aha"/></marker><marker id="ahw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahw"/></marker></defs></svg>
+<main id="main">
+<h1><span class="kicker">Lectures 9 to 11</span>Advanced OOP and Testbench Guidelines</h1><details class="toc"><summary>Steps in this lecture (11)</summary><ol><li><a href="#step-1">The running example</a></li><li><a href="#step-2">An extended class for error injection</a></li><li><a href="#step-3">Base handles, extended objects, and virtual methods</a></li><li><a href="#step-4">The blueprint pattern</a></li><li><a href="#step-5">Build, run, wrap up</a></li><li><a href="#step-6">Upcasting, downcasting and $cast</a></li><li><a href="#step-7">A copy method that works with inheritance</a></li><li><a href="#step-8">Abstract classes</a></li><li><a href="#step-9">Callbacks</a></li><li><a href="#step-10">Scoreboards, often fed by callbacks</a></li><li><a href="#step-11">Parameterized classes</a></li><li><a href="#traps">Traps to watch for</a></li><li><a href="#practice">Practice</a></li></ol></details><p class="lead">This lecture shows how inheritance and virtual methods let one testbench run many different tests without being edited. Tests change behavior by swapping in extended classes. It follows chapter 8 of Spear and Tumbush.</p>
+<p>One new word first. A method's prototype is its first line, giving the name, arguments and return type.</p>
+<h3 id="step-1"><span class="stepno">Step 1</span>The running example</h3>
+<p>The slides use a small testbench. The test controls a generator, the generator sends random transactions to a driver through a mailbox, and the driver wiggles the DUT pins.</p>
+<p>The base Transaction class holds source and destination addresses, 8 data words and a checksum. It has a method to compute the checksum and one to display. Both are declared virtual, which allows a child class to redefine them.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>Transaction holds random src, dst and 8 data words, plus csm
+
+calc_csm (children may replace it):
+    csm = src XOR dst XOR every data word
+
+display (children may replace it):
+    print src, dst and csm</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class Transaction;
+  rand bit [31:0] src, dst, data[8];
+  bit [31:0] csm;
+
+  virtual function void calc_csm();
+    csm = src ^ dst ^ data.xor();
+  endfunction
+
+  virtual function void display(string prefix = &quot;&quot;);
+    $display(&quot;%sTr src=%h dst=%h csm=%h&quot;, prefix, src, dst, csm);
+  endfunction
+endclass</code></pre></details></div>
+<h3 id="step-2"><span class="stepno">Step 2</span>An extended class for error injection</h3>
+<p>BadTr extends Transaction to inject errors. It adds one property, bad_csm, and redefines both methods. super still reaches the parent's versions.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>BadTr is a Transaction plus one random bit, bad_csm
+
+calc_csm:
+    compute the normal checksum (the parent&#x27;s version)
+    if bad_csm is 1, flip every bit of csm   (a deliberate error)
+
+display:
+    print bad_csm, then run the parent&#x27;s display</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class BadTr extends Transaction;
+  rand bit bad_csm;
+
+  virtual function void calc_csm();
+    super.calc_csm();          <span class="c">// compute the good checksum</span>
+    if (bad_csm) csm = ~csm;   <span class="c">// then corrupt it on purpose</span>
+  endfunction
+
+  virtual function void display(string prefix = &quot;&quot;);
+    $write(&quot;%sBadTr bad_csm=%b &quot;, prefix, bad_csm);
+    super.display();
+  endfunction
+endclass</code></pre></details></div>
+<p>If the parent's new() takes arguments, the child's new() must call super.new(...) with them on its first line.</p>
+<h3 id="step-3"><span class="stepno">Step 3</span>Base handles, extended objects, and virtual methods</h3>
+<p>The driver declares <code>Transaction tr;</code> and pulls from the mailbox. The object it gets might really be a BadTr.</p>
+<figure class="fig"><svg viewBox="0 0 760 245" role="img" aria-label="Which method runs through a base handle"><rect x="20" y="90" width="190" height="64" rx="10" class="bxa"/><text x="115.0" y="118.2" font-size="19" text-anchor="middle" font-weight="700">tr</text><text x="115.0" y="139.1" font-size="16" text-anchor="middle" class="tm">Transaction handle</text><rect x="270" y="90" width="180" height="64" rx="10" class="bx"/><text x="360.0" y="118.2" font-size="19" text-anchor="middle" font-weight="700">object</text><text x="360.0" y="139.1" font-size="16" text-anchor="middle" class="tm">really a BadTr</text><path d="M210 122H270" class="ln" marker-end="url(#ah)"/><rect x="530" y="30" width="210" height="70" rx="10" class="bxg"/><text x="635.0" y="61.2" font-size="19" text-anchor="middle" font-weight="700">virtual method</text><text x="635.0" y="82.0" font-size="16" text-anchor="middle" class="tm">BadTr::calc_csm runs</text><rect x="530" y="150" width="210" height="70" rx="10" class="bxw"/><text x="635.0" y="181.2" font-size="19" text-anchor="middle" font-weight="700">not virtual</text><text x="635.0" y="202.1" font-size="16" text-anchor="middle" class="tm">Transaction::calc_csm</text><path d="M450 122H490V65H530" class="ln" marker-end="url(#ah)"/><path d="M490 122V185H530" class="ln" marker-end="url(#ah)"/><text x="380" y="228" font-size="17" text-anchor="middle" font-weight="700">tr.calc_csm()</text></svg><figcaption>With virtual, the object&#x27;s real type picks the method. Without it, the handle&#x27;s type does.</figcaption></figure>
+<ol>
+<li>A base handle can point at an extended object. No conversion is needed.</li>
+<li>Through that base handle you can only name things the base class has, such as src, dst and csm. You cannot write tr.bad_csm.</li>
+<li>When you call a virtual method like tr.calc_csm(), the object's real type decides which version runs. A BadTr object runs BadTr::calc_csm().</li>
+<li>Without virtual, the handle's type decides, so Transaction::calc_csm() would run even for a BadTr. That is the key difference.</li>
+</ol>
+<p>This is polymorphism, one call that behaves differently depending on the object behind it.</p>
+<p>Two rules come with it. Every redefinition of a virtual method must have the same signature, meaning the same number and types of arguments and the same return type. And new() can never be virtual, because before it runs there is no object whose type could be checked.</p>
+<h3 id="step-4"><span class="stepno">Step 4</span>The blueprint pattern</h3>
+<p>The first generator builds a fresh Transaction inside its loop, which avoids the shared handle bug from Lecture 6. But it can never make a BadTr, and it randomizes right after new(), so a test cannot change its constraints.</p>
+<figure class="fig"><svg viewBox="0 0 760 295" role="img" aria-label="The blueprint pattern"><rect x="30" y="100" width="210" height="74" rx="10" class="bxa"/><text x="135.0" y="133.2" font-size="19" text-anchor="middle" font-weight="700">blueprint</text><text x="135.0" y="154.1" font-size="16" text-anchor="middle" class="tm">randomized each loop</text><rect x="330" y="107" width="60" height="60" rx="0" class="bx"/><rect x="390" y="107" width="60" height="60" rx="0" class="bxa"/><rect x="450" y="107" width="60" height="60" rx="0" class="bxa"/><text x="420" y="96" font-size="16" text-anchor="middle" class="tm">mailbox</text><rect x="560" y="100" width="180" height="74" rx="10" class="bx"/><text x="650.0" y="143.7" font-size="19" text-anchor="middle" font-weight="700">driver</text><path d="M240 137H330" class="ln" marker-end="url(#ah)"/><text x="285" y="127" font-size="15" text-anchor="middle" class="tm">copy()</text><path d="M510 137H560" class="ln" marker-end="url(#ah)"/><rect x="30" y="230" width="210" height="50" rx="10" class="bxq"/><text x="135.0" y="261.6" font-size="19" text-anchor="middle" font-weight="700">BadTr object</text><path d="M135 230V174" class="ln dash" marker-end="url(#ah)"/><text x="150" y="210" font-size="15" text-anchor="start" class="tm">the test can swap the blueprint</text></svg><figcaption>The generator only knows how to randomize and copy its blueprint, so the test can hand it a different kind of object.</figcaption></figure>
+<p>A design pattern is a reusable programming technique. The blueprint pattern fixes both problems.</p>
+<ol>
+<li>The generator holds one object called the blueprint, built once in its constructor.</li>
+<li>Each loop iteration randomizes the blueprint, then puts a copy in the mailbox.</li>
+<li>The generator only knows how to copy. If the test swaps in a different kind of blueprint, copies of that kind go out instead.</li>
+</ol>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>the Generator holds a mailbox and ONE blueprint object
+
+new:
+    remember the mailbox
+    build a plain Transaction as the default blueprint
+
+run(n), repeat n times:
+    randomize the blueprint
+    put a COPY of it in the mailbox   (never the blueprint itself)</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class Generator;
+  mailbox #(Transaction) gen2drv;
+  Transaction blueprint;
+
+  function new(mailbox #(Transaction) gen2drv);
+    this.gen2drv = gen2drv;
+    blueprint = new();                 <span class="c">// default blueprint</span>
+  endfunction
+
+  task run(int num_tr = 10);
+    repeat (num_tr) begin
+      assert(blueprint.randomize());
+      gen2drv.put(blueprint.copy());   <span class="c">// send a copy, never the original</span>
+    end
+  endtask
+endclass</code></pre></details></div>
+<p>Declaration, construction and randomization are now three separate steps, and the test can step in between them.</p>
+<h3 id="step-5"><span class="stepno">Step 5</span>Build, run, wrap up</h3>
+<p>The environment class has three phases, which UVM later formalizes.</p>
+<ol>
+<li>build() is a function that constructs everything. No time passes.</li>
+<li>run() is a task where the simulation actually happens.</li>
+<li>wrap_up() is a task that finishes and reports.</li>
+</ol>
+<p>To inject errors, the test swaps the blueprint between build and run. The begin/end block just limits where the name bad is visible.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>build the environment
+
+build a BadTr and make it the generator&#x27;s blueprint
+
+run the environment
+wrap up</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>program automatic test;
+  Environment env;
+  initial begin
+    env = new();
+    env.build();
+    begin
+      BadTr bad = new();
+      env.gen.blueprint = bad;   <span class="c">// replace the blueprint</span>
+    end
+    env.run();
+    env.wrap_up();
+  end
+endprogram</code></pre></details></div>
+<p>The same trick changes constraints. A class Nearby extends Transaction with <code>constraint c_nearby { dst inside {[src-100 : src+100]}; }</code>, and the test makes a Nearby object the blueprint.</p>
+<h3 id="step-6"><span class="stepno">Step 6</span>Upcasting, downcasting and $cast</h3>
+<p>Upcasting means copying an extended handle into a base handle. It is always legal, as in <code>tr = bad;</code>.</p>
+<p>Downcasting means going the other way, from a base handle to an extended handle. A plain assignment <code>bad = tr;</code> is a compile error, because the object behind tr might be missing bad_csm.</p>
+<p><code>$cast</code> checks the real object type at run time.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>tr is a Transaction handle, bad and b2 are BadTr handles
+
+build a BadTr in bad
+tr = bad                       (always allowed: child into parent)
+
+$cast(b2, tr) as a task:       error if tr is not really a BadTr
+
+if $cast(b2, tr) succeeds:
+    print b2.bad_csm
+otherwise:
+    say &quot;tr is not a BadTr&quot;</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>Transaction tr;
+BadTr       bad, b2;
+
+bad = new();
+tr  = bad;                  <span class="c">// upcast, fine</span>
+
+$cast(b2, tr);              <span class="c">// used as a task, run time error if it fails</span>
+if ($cast(b2, tr))          <span class="c">// used as a function, returns 1 or 0</span>
+  $display(b2.bad_csm);
+else
+  $display(&quot;tr is not a BadTr&quot;);</code></pre></details></div>
+<h3 id="step-7"><span class="stepno">Step 7</span>A copy method that works with inheritance</h3>
+<p>The copy method must keep the same signature in every class, so even BadTr::copy returns a Transaction handle. An optional argument lets the caller supply an existing object to copy into.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>Transaction.copy(to):
+    if no target was given, build a new Transaction, else use the target
+    copy src, dst, data and csm into it
+    give it back
+
+BadTr.copy(to):
+    if no target was given, build a new BadTr, else cast the target to BadTr
+    let the parent&#x27;s copy fill in the shared fields
+    copy bad_csm
+    give it back</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code><span class="c">// in Transaction</span>
+virtual function Transaction copy(Transaction to = null);
+  if (to == null) copy = new();
+  else            copy = to;
+  copy.src = src; copy.dst = dst; copy.data = data; copy.csm = csm;
+endfunction
+
+<span class="c">// in BadTr</span>
+virtual function Transaction copy(Transaction to = null);
+  BadTr bad;
+  if (to == null) bad = new();
+  else            $cast(bad, to);
+  void&#x27;(super.copy(bad));   <span class="c">// parent copies the shared fields</span>
+  bad.bad_csm = bad_csm;
+  return bad;
+endfunction</code></pre></details></div>
+<p>A handle that has never been pointed at an object holds null, and you can test for it with <code>if (h == null)</code>.</p>
+<h3 id="step-8"><span class="stepno">Step 8</span>Abstract classes</h3>
+<p>An abstract class is a base class you are never meant to construct. You mark it with virtual class. Its pure virtual methods have a prototype and no body.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>BaseTr can never be built on its own
+    count is shared by every object, id belongs to each object
+
+every child class MUST write its own:
+    compare, copy, display</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>virtual class BaseTr;
+  static int count;       <span class="c">// one counter shared by all</span>
+  int id;
+  pure virtual function bit compare(BaseTr to);
+  pure virtual function BaseTr copy(BaseTr to = null);
+  pure virtual function void display(string prefix = &quot;&quot;);
+endclass</code></pre></details></div>
+<p>You can declare BaseTr handles but not BaseTr objects. Any class extending it must give a body for every pure virtual method.</p>
+<h3 id="step-9"><span class="stepno">Step 9</span>Callbacks</h3>
+<p>The goal is one environment for every test, where a test can add behavior like dropping, delaying or corrupting a transaction without touching the driver's code.</p>
+<figure class="fig"><svg viewBox="0 0 760 290" role="img" aria-label="Driver loop with callback hooks"><rect x="20" y="50" width="165" height="64" rx="10" class="bx"/><text x="102.5" y="88.7" font-size="19" text-anchor="middle" font-weight="700">get item</text><path d="M185 82H205" class="ln" marker-end="url(#ah)"/><rect x="205" y="50" width="165" height="64" rx="10" class="bxa"/><text x="287.5" y="88.7" font-size="19" text-anchor="middle" font-weight="700">pre_tx hooks</text><path d="M370 82H390" class="ln" marker-end="url(#ah)"/><rect x="390" y="50" width="165" height="64" rx="10" class="bx"/><text x="472.5" y="88.7" font-size="19" text-anchor="middle" font-weight="700">transmit</text><path d="M555 82H575" class="ln" marker-end="url(#ah)"/><rect x="575" y="50" width="165" height="64" rx="10" class="bxa"/><text x="657.5" y="88.7" font-size="19" text-anchor="middle" font-weight="700">post_tx hooks</text><path d="M657 114V150H102V114" class="ln" marker-end="url(#ah)"/><text x="380" y="142" font-size="15" text-anchor="middle" class="tm">forever</text><rect x="180" y="210" width="210" height="64" rx="10" class="bxq"/><text x="285.0" y="238.2" font-size="19" text-anchor="middle" font-weight="700">Driver_cbs_drop</text><text x="285.0" y="259.1" font-size="16" text-anchor="middle" class="tm">added by the test</text><path d="M287 210V114" class="ln dash" marker-end="url(#ah)"/><text x="405" y="246" font-size="16" text-anchor="start" class="tm">plugged in with push_back</text></svg><figcaption>The driver calls whatever callback objects are in its list. The test adds behavior without editing the driver.</figcaption></figure>
+<p>A callback is a hook. The driver calls an empty virtual method at key points, and a test fills that method in through an extended class.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>Driver_cbs: two hooks, pre_tx and post_tx, that do nothing by default
+
+Driver keeps a list of callback objects
+run, forever:
+    drop = no
+    get a transaction
+    let every callback look at it first   (it may set drop)
+    if not dropped, send it
+    let every callback look at it after
+
+Driver_cbs_drop:
+    pre_tx: set drop with a 1 in 100 chance</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>virtual class Driver_cbs;                 <span class="c">// default hooks do nothing</span>
+  virtual task pre_tx (ref Transaction tr, ref bit drop); endtask
+  virtual task post_tx(ref Transaction tr);               endtask
+endclass
+
+class Driver;
+  Driver_cbs cbs[$];                      <span class="c">// a queue, zero or more callbacks</span>
+  task run();
+    Transaction tr; bit drop;
+    forever begin
+      drop = 0;
+      gen2drv.get(tr);
+      foreach (cbs[i]) cbs[i].pre_tx(tr, drop);
+      if (!drop) transmit(tr);
+      foreach (cbs[i]) cbs[i].post_tx(tr);
+    end
+  endtask
+endclass
+
+class Driver_cbs_drop extends Driver_cbs;  <span class="c">// drop 1 percent</span>
+  virtual task pre_tx(ref Transaction tr, ref bit drop);
+    drop = ($urandom_range(0, 99) == 0);
+  endtask
+endclass</code></pre></details></div>
+<p>The test adds it between build and run with <code>env.drv.cbs.push_back(dcd);</code>, where dcd is a Driver_cbs_drop object. The driver never learns what the callback does.</p>
+<h3 id="step-10"><span class="stepno">Step 10</span>Scoreboards, often fed by callbacks</h3>
+<p>A scoreboard has three parts.</p>
+<ol>
+<li>A transform function that computes the expected output for an input.</li>
+<li>Storage for expected values, here a queue.</li>
+<li>A compare method. When the DUT produces a result, it searches the queue. No match is an error, one match is the good case and gets removed, and several matches need a closer look.</li>
+</ol>
+<p>The VMM methodology (an older methodology before UVM) recommends feeding the scoreboard from a driver callback and functional coverage from a monitor callback. Scoreboards and coverage are passive listeners, so callbacks avoid wiring a separate mailbox from every block that has data for them.</p>
+<h3 id="step-11"><span class="stepno">Step 11</span>Parameterized classes</h3>
+<p>A parameterized class takes a type as a parameter, like a C++ template. You give a default type, and anyone can specialize it with another type.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>Stack of some type T   (int if nobody says otherwise)
+    100 private slots and a private position counter
+    push(i): put i at the position, move the position up
+    pop():   move the position down, give back that item
+
+int_stack holds ints, real_stack holds real numbers</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class Stack #(type T = int);
+  local T stack[100];   <span class="c">// local means only this class can touch it</span>
+  local int idx;
+  function void push(T i); stack[idx++] = i; endfunction
+  function T pop();        return stack[--idx]; endfunction
+endclass
+
+Stack           int_stack;    <span class="c">// default, holds int</span>
+Stack #(real)   real_stack;   <span class="c">// specialized to real</span></code></pre></details></div>
+<p>The slides apply this to the generator, <code>class Generator #(type T = BaseTr);</code>, so a test can declare <code>Generator #(Transaction) gen;</code> and reuse the same code for a different transaction type.</p>
+<section class="traps">
+<h3 id="traps">Traps to watch for</h3>
+<ul>
+<li>Forgetting virtual on a method, so the handle type decides which version runs.</li>
+<li>Downcasting with plain assignment instead of $cast.</li>
+<li>A redefined virtual method with a different signature.</li>
+<li>Putting the blueprint itself in the mailbox instead of a copy.</li>
+</ul>
+</section>
+<h3 id="practice">Practice</h3>
+<p>Try each one first, then open the answer.</p>
+<ol class="practice">
+<li><div>You have <code>BadTr b = new();</code>. Is <code>Transaction t = b;</code> legal? Is <code>BadTr b2 = t;</code> legal?</div><details class="answer"><summary>Show answer</summary><div><p>The first direction, extended into base, is legal. The second, base into extended, is a compile error. Use $cast.</p></div></details></li>
+<li><div>calc_csm is not virtual. tr is a Transaction handle pointing to a BadTr object. Which calc_csm runs on tr.calc_csm()?</div><details class="answer"><summary>Show answer</summary><div><p>Transaction::calc_csm, because without virtual the handle type decides.</p></div></details></li>
+<li><div>Same as problem 2 but calc_csm is virtual.</div><details class="answer"><summary>Show answer</summary><div><p>BadTr::calc_csm, because virtual makes the object type decide.</p></div></details></li>
+<li><div>Through a Transaction handle that points to a BadTr, can you read bad_csm? How would you read it?</div><details class="answer"><summary>Show answer</summary><div><p>Not directly. Use <code>if ($cast(b, tr)) $display(b.bad_csm);</code>.</p></div></details></li>
+<li><div>Why can't new() be virtual?</div><details class="answer"><summary>Show answer</summary><div><p>A virtual call looks up the object's type, and before new() finishes there is no object.</p></div></details></li>
+<li><div>A generator puts the blueprint itself into the mailbox 10 times. What goes wrong?</div><details class="answer"><summary>Show answer</summary><div><p>All 10 entries are the same object, so the driver sees the last randomized values repeated.</p></div></details></li>
+<li><div>Write a callback class that delays each transaction by a random 0 to 10 time units before it is sent.</div><details class="answer"><summary>Show answer</summary><div><p>One version is below.</p>
+<div class="pair"><div class="pseudo"><div class="label">Pseudocode</div><pre>Driver_cbs_delay:
+    pre_tx: wait a random 0 to 10 time units before sending</pre></div><details class="code"><summary>Show the SystemVerilog</summary><pre><code>class Driver_cbs_delay extends Driver_cbs;
+  virtual task pre_tx(ref Transaction tr, ref bit drop);
+    #($urandom_range(0, 10));
+  endtask
+endclass</code></pre></details></div></div></details></li>
+</ol>
+</main>
+<nav class="pager" aria-label="Lecture navigation"><a class="prev" href="08-uvm.html"><span class="dir">Previous</span>Lecture 8. UVM</a><a class="next" href="10-assertions-basics.html"><span class="dir">Next</span>Lecture 10. Assertions Basics</a></nav>
+<footer class="site">Study guide for EE 8350, Advanced Verification Methodologies for VLSI Systems. Built from the lecture slides, chapters 1 to 19.</footer>
+<script src="../assets/site.js"></script>
+</body>
+</html>
